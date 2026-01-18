@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h2>Dashboard</h2>
+  <p>Welcome to PBS Explorer.</p>
+  <div id="home-stats" hx-get="/web/stats" hx-trigger="load, every 30s" hx-swap="innerHTML">
+    loading stats...
+  </div>
+</section>
+{% endblock %}

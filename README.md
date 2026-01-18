@@ -1,44 +1,63 @@
-# PBS API Frontend
+# PBS Explorer
 
-A basic HTML frontend for interacting with the PBS (Pharmaceutical Benefits Scheme) Public Data API.
+PBS Explorer is a FastAPI-based platform for exploring Australian PBS data with a searchable API and a lightweight HTMX-style UI.
 
-## Overview
+## Project Structure
 
-This frontend allows you to query various endpoints of the PBS API, which provides data on subsidized medicines in Australia. The API returns data in CSV format.
+- `api/` - API routers and schemas
+- `db/` - SQLAlchemy base and models
+- `services/` - sync and parsing services
+- `web/` - HTML templates and static assets
+- `tasks/` - runnable tasks (sync/bootstrap)
+- `tests/` - tests
 
-## Features
+## Setup
 
-- Dropdown to select API endpoints
-- Optional parameters: schedule_code and limit
-- Displays response data in a scrollable text area
+Create a virtual environment and install dependencies:
 
-## Usage
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-1. Run the local server: `python3 server.py`
-2. Open `http://localhost:8000` in a web browser.
-3. Select an endpoint from the dropdown.
-4. Optionally enter a schedule code (e.g., 3922) and/or limit the number of results (defaults to 100,000 if not specified).
-5. Click "Fetch Data" to make the API call.
-6. View the CSV response in the area below.
+## Configure Environment
 
-## API Details
+You can override settings using environment variables (prefix `PBS_EXPLORER_`), for example:
 
-- Base URL: `https://data-api.health.gov.au/pbs/api/v3/`
-- Authentication: Uses a subscription key in the header.
-- Response Format: CSV
+```bash
+export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="<your-key>"
+export PBS_EXPLORER_DB_TYPE=sqlite
+export PBS_EXPLORER_DB_PATH=./pbs_data.db
+export PBS_EXPLORER_LOG_LEVEL=INFO
+```
 
-## Troubleshooting
+## Bootstrap Database
 
-- **CORS Errors**: The server now proxies API requests to avoid CORS issues. If you still encounter problems, ensure the server is running and try a hard refresh.
-- **API Key**: The subscription key is handled server-side for security.
-- **Large Responses**: Some endpoints return large datasets. Use the limit parameter to restrict results.
-- **Network Issues**: Ensure you have internet access and the API is available.
+```bash
+python -m tasks.bootstrap_db
+```
 
-## Endpoints
+## Run API Server
 
-See the dropdown in the app for all available endpoints. Key ones include:
-- `/schedules`: Get PBS schedules
-- `/items`: Get PBS items (medicines)
-- `/restrictions`: Get prescribing restrictions
+```bash
+uvicorn main:app --reload
+```
 
-For full API documentation, refer to the official PBS API docs.
+## Run Sync Task
+
+```bash
+python -m tasks.sync
+```
+
+## Docker
+
+```bash
+docker build -t pbs-explorer .
+docker run -p 8000:8000 -e PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=... pbs-explorer
+```
+
+## Notes
+
+- SQLite is used by default; update environment variables for PostgreSQL.
+- Health endpoint is available at `/api/v1/health`.

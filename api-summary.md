@@ -1,6 +1,4 @@
-# PBS Public Data API Summary
-
-The **PBS Public Data API** is a Postman collection for accessing the Pharmaceutical Benefits Scheme (PBS) data from the Australian Department of Health. It provides programmatic access to detailed information about subsidized medicines, pricing, restrictions, and related entities. The collection is based on the official PBS API (v3) and includes 35 GET endpoints.
+# PBS API Summary
 
 ## Key Details
 - **Base URL**: `https://data-api.health.gov.au/pbs/api/v3/`
@@ -15,8 +13,7 @@ The **PBS Public Data API** is a Postman collection for accessing the Pharmaceut
   - `limit`: Result limit (e.g., 100,000).
 - **Structure**: All requests are at the root level (no folders). The first request (`/schedules`) includes a test script to extract and set the `schedule_code` variable for subsequent calls.
 
-## API Endpoints and Methods
-All endpoints use **GET** method and follow a consistent pattern: base URL + endpoint + query params. Here's a categorized summary:
+## API Endpoints
 
 ### 1. Core Data Entities
 - `/schedules`: Retrieves PBS schedules (e.g., pricing periods). Includes a test script to set `schedule_code`.
@@ -25,42 +22,41 @@ All endpoints use **GET** method and follow a consistent pattern: base URL + end
 - `/containers`: Packaging/container details.
 - `/programs`: PBS programs or schemes.
 
-### 2. Pricing and Fees
-- `/copayments`: Patient copayment amounts.
-- `/fees`: Dispensing fees.
-- `/item-pricing-events`: Historical pricing changes.
-- `/markup-bands`: Pricing markup bands.
-- `/extemporaneous-tariffs`: Tariffs for extemporaneous preparations.
+### 2. Classifications & Rules
+- `/atc-codes`: ATC classification codes and hierarchy.
+- `/dispensing-rules`: Rules for dispensing PBS items.
+- `/criteria`: Criteria related to restrictions.
+- `/parameters`: Parameter definitions for criteria.
 
-### 3. Restrictions and Criteria
-- `/restrictions`: PBS restrictions on prescribing.
-- `/criteria`: Criteria for restrictions.
-- `/parameters`: Parameters for criteria.
-- `/indications`: Approved indications for items.
-- `/prescribing-texts`: Prescribing guidelines.
-- `/prescribers`: Authorized prescribers.
+### 3. Restrictions & Texts
+- `/restrictions`: PBS prescribing restrictions.
+- `/prescribing-texts`: Prescribing notes and guidance.
+- `/indications`: Clinical indications related to restrictions.
 
-### 4. Relationships and Classifications
-- `/atc-codes`: Anatomical Therapeutic Chemical (ATC) classifications.
-- `/item-atc-relationships`: Links items to ATC codes.
-- `/item-organisation-relationships`: Links items to organizations.
-- `/item-restriction-relationships`: Links items to restrictions.
-- `/item-prescribing-text-relationships`: Links items to prescribing texts.
-- `/restriction-prescribing-text-relationships`: Links restrictions to texts.
-- `/criteria-parameter-relationships`: Links criteria to parameters.
-- `/container-organisation-relationships`: Links containers to organizations.
+### 4. Financial & Pricing
+- `/copayments`: Patient co-payment amounts.
+- `/fees`: Dispensing fees and related charges.
+- `/item-pricing-events`: Historical pricing events for items.
+- `/markup-bands`: Price markup bands.
 
-### 5. Dispensing and Preparations
-- `/dispensing-rules`: Rules for dispensing.
-- `/item-dispensing-rule-relationships`: Links items to dispensing rules.
+### 5. Relationships
+- `/item-atc-relationships`: Links between items and ATC codes.
+- `/item-organisation-relationships`: Links between items and organisations.
+- `/item-restriction-relationships`: Links between items and restrictions.
+- `/item-dispensing-rule-relationships`: Links between items and dispensing rules.
+- `/item-prescribing-text-relationships`: Links between items and prescribing texts.
+- `/restriction-prescribing-text-relationships`: Links between restrictions and prescribing texts.
+- `/criteria-parameter-relationships`: Links between restriction criteria and parameters.
+- `/container-organisation-relationships`: Links between containers and organisations.
+
+### 6. Other / Supplementary Data
 - `/amt-items`: Australian Medicines Terminology (AMT) items.
-- `/extemporaneous-preparations`: Extemporaneous (compounded) preparations.
-- `/extemporaneous-ingredients`: Ingredients for extemporaneous prep.
-- `/extemporaneous-prep-sfp-relationships`: Links to standard formula preparations.
+- `/extemporaneous-preparations`: Compounded preparation data.
+- `/extemporaneous-ingredients`: Ingredients used in compounded preparations.
+- `/extemporaneous-tariffs`: Pricing for compounded preparations.
 - `/standard-formula-preparations`: Standard formula preparations.
-
-### 6. Other
-- `/summary-of-changes`: Summary of PBS changes.
+- `/prescribers`: Authorized prescriber information.
+- `/summary-of-changes`: Summary of PBS changes across schedules.
 
 ## Usage Notes
 - **Workflow**: Start with `/schedules` to get the latest schedule code, then query other endpoints with that code.

@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  pbs-explorer:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PBS_EXPLORER_DB_TYPE=sqlite
+      - PBS_EXPLORER_DB_PATH=/app/pbs_data.db
+      - PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=${PBS_EXPLORER_PBS_SUBSCRIPTION_KEY}
+      - PBS_EXPLORER_LOG_LEVEL=INFO
+    volumes:
+      - ./pbs_data.db:/app/pbs_data.db

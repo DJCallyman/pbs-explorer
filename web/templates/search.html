@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h2>Search</h2>
+  <form class="search-form" hx-get="/web/items" hx-target="#results" hx-swap="innerHTML">
+    <input type="text" name="drug_name" placeholder="Drug name" />
+    <input type="text" name="brand_name" placeholder="Brand name" />
+    <select name="program_code">
+      <option value="">All Programs</option>
+      <option value="GE">General Schedule</option>
+      <option value="RP">Repatriation</option>
+    </select>
+    <select name="benefit_type_code">
+      <option value="">All Benefit Types</option>
+      <option value="U">Unrestricted</option>
+      <option value="R">Restricted</option>
+      <option value="A">Authority Required</option>
+      <option value="S">Streamlined</option>
+    </select>
+    <button type="submit">Search</button>
+    <button type="reset">Clear</button>
+  </form>
+  <div id="results" class="results"></div>
+</section>
+{% endblock %}

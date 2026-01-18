@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBS Data Explorer</title>
+    
+    <!-- Tabulator CSS -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator_midnight.min.css" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%);
+            padding: 20px 30px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #4cc9f0;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #4361ee;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #3a56d4;
+        }
+        
+        .btn-secondary {
+            background: #2d3748;
+            color: #eee;
+            border: 1px solid #444;
+        }
+        
+        .btn-secondary:hover {
+            background: #3d4758;
+        }
+        
+        .btn-success {
+            background: #06d6a0;
+            color: #1a1a2e;
+        }
+        
+        .btn-success:hover {
+            background: #05c090;
+        }
+        
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            background: #16213e;
+            padding: 0 20px;
+            border-bottom: 1px solid #333;
+            overflow-x: auto;
+        }
+        
+        .tab-btn {
+            padding: 15px 20px;
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .tab-btn:hover {
+            color: #ccc;
+        }
+        
+        .tab-btn.active {
+            color: #4cc9f0;
+            border-bottom-color: #4cc9f0;
+        }
+        
+        /* Main Content */
+        .main-content {
+            padding: 20px;
+            max-width: 100%;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Search Panels */
+        .search-panel {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        
+        .search-panel h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            color: #4cc9f0;
+        }
+        
+        .search-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #444;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #eee;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4361ee;
+        }
+        
+        /* Results Info */
+        .results-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            background: #16213e;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        
+        .results-count {
+            color: #4cc9f0;
+            font-weight: 500;
+        }
+        
+        .export-btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* Loading Indicator */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #333;
+            border-top-color: #4cc9f0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Data Table Container */
+        .table-container {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #333;
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid #333;
+        }
+        
+        .chart-container h3 {
+            margin: 0 0 15px 0;
+            color: #4cc9f0;
+        }
+        
+        .chart-wrapper {
+            height: 300px;
+            position: relative;
+        }
+        
+        /* Item Detail Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: #16213e;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #444;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #4cc9f0;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        
+        .detail-section h4 {
+            color: #4cc9f0;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .detail-item {
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        
+        .detail-item label {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        
+        .detail-item span {
+            font-size: 14px;
+            color: #eee;
+        }
+        
+        /* Tabulator Customization */
+        .tabulator {
+            background: transparent;
+            border: none;
+        }
+        
+        .tabulator-row.tabulator-row-even {
+            background-color: rgba(255,255,255,0.02);
+        }
+        
+        .tabulator-row:hover {
+            background-color: rgba(67, 97, 238, 0.1) !important;
+        }
+        
+        .tabulator-cell {
+            border-right: 1px solid #333;
+        }
+        
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-info {
+            background: rgba(67, 97, 238, 0.2);
+            color: #4361ee;
+        }
+        
+        .badge-success {
+            background: rgba(6, 214, 160, 0.2);
+            color: #06d6a0;
+        }
+        
+        .badge-warning {
+            background: rgba(255, 190, 11, 0.2);
+            color: #ffbe0b;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        
+        .stat-card .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #4cc9f0;
+        }
+        
+        .stat-card .stat-label {
+            font-size: 13px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .tab-nav {
+                padding: 0 10px;
+            }
+            
+            .tab-btn {
+                padding: 12px 15px;
+                font-size: 13px;
+            }
+            
+            .search-row {
+                flex-direction: column;
+            }
+            
+            .form-group {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 PBS Data Explorer</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="refreshCache()">🔄 Refresh Cache</button>
+            <button class="btn btn-secondary" onclick="showCacheStats()">📊 Cache Stats</button>
+        </div>
+    </div>
+    
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+        <button class="tab-btn" data-tab="earliest-listing">📅 Earliest Listing</button>
+        <button class="tab-btn" data-tab="incidents">🔔 Incident Search</button>
+        <button class="tab-btn" data-tab="atc-browser">🌳 ATC Browser</button>
+        <button class="tab-btn" data-tab="manufacturers">🏭 Manufacturers</button>
+        <button class="tab-btn" data-tab="schedule-compare">⚖️ Schedule Compare</button>
+        <button class="tab-btn" data-tab="changes">📰 Recent Changes</button>
+        <button class="tab-btn" data-tab="raw-query">🔧 Raw Query</button>
+    </nav>
+    
+    <div class="main-content">
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid" id="dashboard-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-schedules">-</div>
+                    <div class="stat-label">Available Schedules</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-cache">-</div>
+                    <div class="stat-label">Cached Datasets</div>
+                </div>
+            </div>
+            
+            <div class="search-panel">
+                <h2>Quick Search</h2>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Search for medicine</label>
+                        <input type="text" id="quick-search" placeholder="Enter drug name or PBS code...">
+                    </div>
+                    <button class="btn btn-primary" onclick="quickSearch()">Search</button>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <h3>Recent PBS Changes (Last 30 Days)</h3>
+                <div class="chart-wrapper">
+                    <canvas id="changes-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Earliest Listing Tab -->
+        <div id="earliest-listing" class="tab-content">
+            <div class="search-panel">
+                <h2>Search Earliest PBS Listings</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Find when a medicine was first listed on the PBS</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Drug Name</label>
+                        <input type="text" id="earliest-query" placeholder="e.g., paracetamol, amoxicillin...">
+                    </div>
+                    <button class="btn btn-primary" onclick="searchEarliestListing()">Search</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="earliest-loading">
+                <div class="loading-spinner"></div>
+                <p>Searching across all schedules...</p>
+            </div>
+            
+            <div class="results-info" id="earliest-results-info" style="display: none;">
+                <span class="results-count" id="earliest-count">0 results</span>
+                <div class="export-btns">
+                    <button class="btn btn-secondary" onclick="exportTable('earliest-table', 'csv')">📥 CSV</button>
+                    <button class="btn btn-secondary" onclick="exportTable('earliest-table', 'json')">📥 JSON</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="earliest-table"></div>
+            </div>
+        </div>
+        
+        <!-- Incident Search Tab -->
+        <div id="incidents" class="tab-content">
+            <div class="search-panel">
+                <h2>Search PBS Incidents</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Find incident numbers associated with drug changes</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Drug Name or PBS Code</label>
+                        <input type="text" id="incident-query" placeholder="e.g., atorvastatin...">
+                    </div>
+                    <div class="form-group">
+                        <label>Incident Number (optional)</label>
+                        <input type="text" id="incident-number" placeholder="e.g., 12345...">
+                    </div>
+                    <button class="btn btn-primary" onclick="searchIncidents()">Search</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="incident-loading">
+                <div class="loading-spinner"></div>
+                <p>Searching incidents...</p>
+            </div>
+            
+            <div class="results-info" id="incident-results-info" style="display: none;">
+                <span class="results-count" id="incident-count">0 results</span>
+                <div class="export-btns">
+                    <button class="btn btn-secondary" onclick="exportTable('incident-table', 'csv')">📥 CSV</button>
+                    <button class="btn btn-secondary" onclick="exportTable('incident-table', 'json')">📥 JSON</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="incident-table"></div>
+            </div>
+        </div>
+        
+        <!-- ATC Browser Tab -->
+        <div id="atc-browser" class="tab-content">
+            <div class="search-panel">
+                <h2>ATC Classification Browser</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Browse medicines by Anatomical Therapeutic Chemical classification</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Filter ATC Codes</label>
+                        <input type="text" id="atc-filter" placeholder="e.g., N02 for analgesics...">
+                    </div>
+                    <button class="btn btn-primary" onclick="loadATCHierarchy()">Load ATC Codes</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="atc-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading ATC hierarchy...</p>
+            </div>
+            
+            <div class="results-info" id="atc-results-info" style="display: none;">
+                <span class="results-count" id="atc-count">0 codes</span>
+                <div class="export-btns">
+                    <button class="btn btn-secondary" onclick="exportTable('atc-table', 'csv')">📥 CSV</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="atc-table"></div>
+            </div>
+        </div>
+        
+        <!-- Manufacturers Tab -->
+        <div id="manufacturers" class="tab-content">
+            <div class="search-panel">
+                <h2>Manufacturer Portfolio</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">View all PBS items by manufacturer/sponsor</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Manufacturer Name</label>
+                        <input type="text" id="manufacturer-query" placeholder="e.g., Pfizer, GSK...">
+                    </div>
+                    <button class="btn btn-primary" onclick="searchManufacturers()">Search</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="manufacturer-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading manufacturer data...</p>
+            </div>
+            
+            <div class="results-info" id="manufacturer-results-info" style="display: none;">
+                <span class="results-count" id="manufacturer-count">0 manufacturers</span>
+            </div>
+            
+            <div class="table-container">
+                <div id="manufacturer-table"></div>
+            </div>
+        </div>
+        
+        <!-- Schedule Compare Tab -->
+        <div id="schedule-compare" class="tab-content">
+            <div class="search-panel">
+                <h2>Compare Schedules</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Compare items between different PBS schedules</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Schedule 1</label>
+                        <select id="schedule-1">
+                            <option value="">Loading schedules...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Schedule 2</label>
+                        <select id="schedule-2">
+                            <option value="">Loading schedules...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="compareSchedules()">Compare</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="compare-loading">
+                <div class="loading-spinner"></div>
+                <p>Comparing schedules...</p>
+            </div>
+            
+            <div id="compare-results" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="compare-total">-</div>
+                        <div class="stat-label">Total Unique Items</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="compare-added">-</div>
+                        <div class="stat-label">Items Added</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="compare-removed">-</div>
+                        <div class="stat-label">Items Removed</div>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <h3 style="color: #4cc9f0; margin-bottom: 15px;">Added Items</h3>
+                    <div id="compare-added-table"></div>
+                </div>
+                
+                <div class="table-container" style="margin-top: 20px;">
+                    <h3 style="color: #4cc9f0; margin-bottom: 15px;">Removed Items</h3>
+                    <div id="compare-removed-table"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Changes Tab -->
+        <div id="changes" class="tab-content">
+            <div class="search-panel">
+                <h2>PBS Change Alerts</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Recent changes to the PBS</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Change Type Filter</label>
+                        <input type="text" id="change-type-filter" placeholder="e.g., new listing, price...">
+                    </div>
+                    <div class="form-group">
+                        <label>Limit</label>
+                        <input type="number" id="change-limit" value="100" min="1" max="1000">
+                    </div>
+                    <button class="btn btn-primary" onclick="loadRecentChanges()">Load Changes</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="changes-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading changes...</p>
+            </div>
+            
+            <div class="results-info" id="changes-results-info" style="display: none;">
+                <span class="results-count" id="changes-count">0 changes</span>
+                <div class="export-btns">
+                    <button class="btn btn-secondary" onclick="exportTable('changes-table', 'csv')">📥 CSV</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="changes-table"></div>
+            </div>
+        </div>
+        
+        <!-- Raw Query Tab -->
+        <div id="raw-query" class="tab-content">
+            <div class="search-panel">
+                <h2>Raw API Query</h2>
+                <p style="color: #888; margin: 0 0 15px 0;">Query the PBS API directly</p>
+                <div class="search-row">
+                    <div class="form-group">
+                        <label>Endpoint</label>
+                        <select id="raw-endpoint">
+                            <option value="schedules">/schedules</option>
+                            <option value="items">/items</option>
+                            <option value="organisations">/organisations</option>
+                            <option value="containers">/containers</option>
+                            <option value="programs">/programs</option>
+                            <option value="copayments">/copayments</option>
+                            <option value="fees">/fees</option>
+                            <option value="item-pricing-events">/item-pricing-events</option>
+                            <option value="markup-bands">/markup-bands</option>
+                            <option value="restrictions">/restrictions</option>
+                            <option value="criteria">/criteria</option>
+                            <option value="indications">/indications</option>
+                            <option value="prescribing-texts">/prescribing-texts</option>
+                            <option value="atc-codes">/atc-codes</option>
+                            <option value="item-atc-relationships">/item-atc-relationships</option>
+                            <option value="item-organisation-relationships">/item-organisation-relationships</option>
+                            <option value="item-restriction-relationships">/item-restriction-relationships</option>
+                            <option value="dispensing-rules">/dispensing-rules</option>
+                            <option value="summary-of-changes">/summary-of-changes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Schedule Code (optional)</label>
+                        <input type="text" id="raw-schedule" placeholder="e.g., 3922">
+                    </div>
+                    <div class="form-group">
+                        <label>Limit</label>
+                        <input type="number" id="raw-limit" value="1000" min="1" max="100000">
+                    </div>
+                    <button class="btn btn-primary" onclick="executeRawQuery()">Execute</button>
+                </div>
+            </div>
+            
+            <div class="loading" id="raw-loading">
+                <div class="loading-spinner"></div>
+                <p>Fetching data...</p>
+            </div>
+            
+            <div class="results-info" id="raw-results-info" style="display: none;">
+                <span class="results-count" id="raw-count">0 rows</span>
+                <div class="export-btns">
+                    <button class="btn btn-secondary" onclick="exportTable('raw-table', 'csv')">📥 CSV</button>
+                    <button class="btn btn-secondary" onclick="exportTable('raw-table', 'json')">📥 JSON</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div id="raw-table"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Item Detail Modal -->
+    <div class="modal-overlay" id="item-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Item Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabulator JS -->
+    <script src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    
+    <script>
+        // ================================================================
+        // Global State
+        // ================================================================
+        const tables = {};
+        let schedulesData = [];
+        let changesChart = null;
+        
+        // ================================================================
+        // Tab Navigation
+        // ================================================================
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // ================================================================
+        // Utility Functions
+        // ================================================================
+        function showLoading(id) {
+            document.getElementById(id).classList.add('active');
+        }
+        
+        function hideLoading(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+        
+        async function fetchJSON(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+        
+        async function fetchCSV(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.text();
+        }
+        
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            if (lines.length < 2) return [];
+            
+            const headers = parseCSVLine(lines[0]);
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                const row = {};
+                headers.forEach((h, idx) => {
+                    row[h] = values[idx] || '';
+                });
+                data.push(row);
+            }
+            
+            return data;
+        }
+        
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    if (inQuotes && line[i + 1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current);
+            return result;
+        }
+        
+        function createTable(elementId, data, columns, options = {}) {
+            if (tables[elementId]) {
+                tables[elementId].destroy();
+            }
+            
+            const defaultOptions = {
+                data: data,
+                columns: columns,
+                layout: "fitDataStretch",
+                height: "500px",
+                pagination: true,
+                paginationSize: 50,
+                paginationSizeSelector: [25, 50, 100, 250],
+                movableColumns: true,
+                resizableRows: true,
+                placeholder: "No data available",
+                headerFilterPlaceholder: "Filter...",
+            };
+            
+            tables[elementId] = new Tabulator(`#${elementId}`, {
+                ...defaultOptions,
+                ...options
+            });
+            
+            return tables[elementId];
+        }
+        
+        function exportTable(tableId, format) {
+            if (!tables[tableId]) return;
+            
+            if (format === 'csv') {
+                tables[tableId].download("csv", `pbs-export-${Date.now()}.csv`);
+            } else if (format === 'json') {
+                tables[tableId].download("json", `pbs-export-${Date.now()}.json`);
+            }
+        }
+        
+        // ================================================================
+        // Dashboard
+        // ================================================================
+        async function loadDashboard() {
+            try {
+                // Load schedules
+                const scheduleData = await fetchJSON('/api/schedules-list');
+                schedulesData = scheduleData.schedules || [];
+                document.getElementById('stat-schedules').textContent = schedulesData.length;
+                
+                // Populate schedule dropdowns
+                populateScheduleDropdowns();
+                
+                // Load cache stats
+                const cacheStats = await fetchJSON('/api/cache/stats');
+                document.getElementById('stat-cache').textContent = cacheStats.total_keys || 0;
+                
+                // Load recent changes for chart
+                const changesData = await fetchJSON('/api/recent-changes?limit=100');
+                renderChangesChart(changesData.results || []);
+                
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+            }
+        }
+        
+        function populateScheduleDropdowns() {
+            const selects = ['schedule-1', 'schedule-2'];
+            selects.forEach(id => {
+                const select = document.getElementById(id);
+                select.innerHTML = '<option value="">Select schedule...</option>';
+                schedulesData.forEach(s => {
+                    const code = s.schedule_code || s.SCHEDULE_CODE || '';
+                    const name = s.schedule_name || s.SCHEDULE_NAME || code;
+                    select.innerHTML += `<option value="${code}">${name}</option>`;
+                });
+            });
+        }
+        
+        function renderChangesChart(changes) {
+            const ctx = document.getElementById('changes-chart').getContext('2d');
+            
+            // Group by date
+            const dateCounts = {};
+            changes.forEach(c => {
+                const date = (c.change_date || c.effective_date || '').split('T')[0];
+                if (date) {
+                    dateCounts[date] = (dateCounts[date] || 0) + 1;
+                }
+            });
+            
+            const labels = Object.keys(dateCounts).sort();
+            const data = labels.map(d => dateCounts[d]);
+            
+            if (changesChart) {
+                changesChart.destroy();
+            }
+            
+            changesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Changes',
+                        data: data,
+                        backgroundColor: 'rgba(67, 97, 238, 0.6)',
+                        borderColor: '#4361ee',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            },
+                            ticks: {
+                                color: '#888'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255,255,255,0.1)'
+                            },
+                            ticks: {
+                                color: '#888'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function refreshCache() {
+            if (confirm('Clear all cached data? This will require re-fetching from the API.')) {
+                try {
+                    await fetchJSON('/api/cache/clear');
+                    alert('Cache cleared successfully');
+                    loadDashboard();
+                } catch (error) {
+                    alert('Error clearing cache: ' + error.message);
+                }
+            }
+        }
+        
+        async function showCacheStats() {
+            try {
+                const stats = await fetchJSON('/api/cache/stats');
+                let message = `Cached Datasets: ${stats.total_keys}\n\n`;
+                for (const [key, info] of Object.entries(stats.entries || {})) {
+                    message += `${key}: ${info.row_count} rows, expires in ${Math.round(info.expires_in_seconds/60)} min\n`;
+                }
+                alert(message);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        function quickSearch() {
+            const query = document.getElementById('quick-search').value.trim();
+            if (query) {
+                document.getElementById('earliest-query').value = query;
+                document.querySelector('[data-tab="earliest-listing"]').click();
+                searchEarliestListing();
+            }
+        }
+        
+        // ================================================================
+        // Earliest Listing Search
+        // ================================================================
+        async function searchEarliestListing() {
+            const query = document.getElementById('earliest-query').value.trim();
+            
+            showLoading('earliest-loading');
+            document.getElementById('earliest-results-info').style.display = 'none';
+            
+            try {
+                const url = `/api/search/earliest-listing${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+                const data = await fetchJSON(url);
+                
+                hideLoading('earliest-loading');
+                
+                const results = data.results || [];
+                document.getElementById('earliest-count').textContent = `${results.length} medicines found`;
+                document.getElementById('earliest-results-info').style.display = 'flex';
+                
+                createTable('earliest-table', results, [
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 },
+                    { title: "Earliest PBS Code", field: "earliest_pbs_code", headerFilter: true },
+                    { title: "First Listed", field: "earliest_listing_date", headerFilter: true, sorter: "date" },
+                    { title: "Schedule", field: "earliest_schedule_code", headerFilter: true },
+                    { title: "# Codes", field: "all_pbs_codes", formatter: cell => cell.getValue()?.length || 0 },
+                    { 
+                        title: "Actions", 
+                        formatter: (cell) => '<button class="btn btn-secondary" style="padding:4px 8px;font-size:12px;">View Details</button>',
+                        cellClick: (e, cell) => viewItemDetails(cell.getRow().getData().earliest_pbs_code)
+                    }
+                ]);
+                
+            } catch (error) {
+                hideLoading('earliest-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Incident Search
+        // ================================================================
+        async function searchIncidents() {
+            const query = document.getElementById('incident-query').value.trim();
+            const incident = document.getElementById('incident-number').value.trim();
+            
+            showLoading('incident-loading');
+            document.getElementById('incident-results-info').style.display = 'none';
+            
+            try {
+                const params = new URLSearchParams();
+                if (query) params.append('q', query);
+                if (incident) params.append('incident', incident);
+                
+                const url = `/api/search/incidents?${params.toString()}`;
+                const data = await fetchJSON(url);
+                
+                hideLoading('incident-loading');
+                
+                const results = data.results || [];
+                document.getElementById('incident-count').textContent = `${results.length} incidents found`;
+                document.getElementById('incident-results-info').style.display = 'flex';
+                
+                createTable('incident-table', results, [
+                    { title: "Incident #", field: "incident_number", headerFilter: true },
+                    { title: "PBS Code", field: "pbs_code", headerFilter: true },
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 },
+                    { title: "Change Type", field: "change_type", headerFilter: true },
+                    { title: "Date", field: "change_date", headerFilter: true, sorter: "date" },
+                    { title: "Description", field: "description", headerFilter: true, widthGrow: 2 }
+                ]);
+                
+            } catch (error) {
+                hideLoading('incident-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // ATC Browser
+        // ================================================================
+        async function loadATCHierarchy() {
+            const filter = document.getElementById('atc-filter').value.trim().toUpperCase();
+            
+            showLoading('atc-loading');
+            document.getElementById('atc-results-info').style.display = 'none';
+            
+            try {
+                const data = await fetchJSON('/api/atc-hierarchy');
+                hideLoading('atc-loading');
+                
+                // Flatten hierarchy for table display
+                let allCodes = [];
+                for (const [level, codes] of Object.entries(data.levels || {})) {
+                    codes.forEach(c => {
+                        c.atc_level = level;
+                        allCodes.push(c);
+                    });
+                }
+                
+                // Filter if needed
+                if (filter) {
+                    allCodes = allCodes.filter(c => 
+                        (c.atc_code || '').toUpperCase().startsWith(filter) ||
+                        (c.atc_name || '').toUpperCase().includes(filter)
+                    );
+                }
+                
+                document.getElementById('atc-count').textContent = `${allCodes.length} ATC codes`;
+                document.getElementById('atc-results-info').style.display = 'flex';
+                
+                createTable('atc-table', allCodes, [
+                    { title: "ATC Code", field: "atc_code", headerFilter: true },
+                    { title: "Name", field: "atc_name", headerFilter: true, widthGrow: 3 },
+                    { title: "Level", field: "atc_level", headerFilter: true }
+                ]);
+                
+            } catch (error) {
+                hideLoading('atc-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Manufacturers
+        // ================================================================
+        async function searchManufacturers() {
+            const query = document.getElementById('manufacturer-query').value.trim();
+            
+            showLoading('manufacturer-loading');
+            document.getElementById('manufacturer-results-info').style.display = 'none';
+            
+            try {
+                const url = `/api/manufacturer-portfolio${query ? `?q=${encodeURIComponent(query)}` : ''}`;
+                const data = await fetchJSON(url);
+                
+                hideLoading('manufacturer-loading');
+                
+                const results = data.results || [];
+                
+                // Flatten for table
+                const flatData = [];
+                results.forEach(r => {
+                    const org = r.organisation || {};
+                    r.items.forEach(item => {
+                        flatData.push({
+                            organisation_name: org.organisation_name || org.name || '',
+                            organisation_code: org.organisation_code || org.code || '',
+                            pbs_code: item.pbs_code,
+                            drug_name: item.drug_name,
+                            brand_name: item.brand_name,
+                            relationship_type: item.relationship_type
+                        });
+                    });
+                });
+                
+                document.getElementById('manufacturer-count').textContent = 
+                    `${results.length} manufacturers, ${flatData.length} items`;
+                document.getElementById('manufacturer-results-info').style.display = 'flex';
+                
+                createTable('manufacturer-table', flatData, [
+                    { title: "Manufacturer", field: "organisation_name", headerFilter: true, widthGrow: 2 },
+                    { title: "PBS Code", field: "pbs_code", headerFilter: true },
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 },
+                    { title: "Brand", field: "brand_name", headerFilter: true },
+                    { title: "Relationship", field: "relationship_type", headerFilter: true }
+                ]);
+                
+            } catch (error) {
+                hideLoading('manufacturer-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Schedule Comparison
+        // ================================================================
+        async function compareSchedules() {
+            const schedule1 = document.getElementById('schedule-1').value;
+            const schedule2 = document.getElementById('schedule-2').value;
+            
+            if (!schedule1 || !schedule2) {
+                alert('Please select two schedules to compare');
+                return;
+            }
+            
+            showLoading('compare-loading');
+            document.getElementById('compare-results').style.display = 'none';
+            
+            try {
+                const url = `/api/compare-schedules?schedules=${schedule1},${schedule2}`;
+                const data = await fetchJSON(url);
+                
+                hideLoading('compare-loading');
+                document.getElementById('compare-results').style.display = 'block';
+                
+                document.getElementById('compare-total').textContent = data.total_unique_items || 0;
+                
+                const added = data.items_added?.[schedule2] || [];
+                const removed = data.items_removed?.[schedule2] || [];
+                
+                document.getElementById('compare-added').textContent = added.length;
+                document.getElementById('compare-removed').textContent = removed.length;
+                
+                createTable('compare-added-table', added, [
+                    { title: "PBS Code", field: "pbs_code", headerFilter: true },
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 }
+                ], { height: "300px" });
+                
+                createTable('compare-removed-table', removed, [
+                    { title: "PBS Code", field: "pbs_code", headerFilter: true },
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 }
+                ], { height: "300px" });
+                
+            } catch (error) {
+                hideLoading('compare-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Recent Changes
+        // ================================================================
+        async function loadRecentChanges() {
+            const changeType = document.getElementById('change-type-filter').value.trim();
+            const limit = document.getElementById('change-limit').value || 100;
+            
+            showLoading('changes-loading');
+            document.getElementById('changes-results-info').style.display = 'none';
+            
+            try {
+                const params = new URLSearchParams({ limit: limit });
+                if (changeType) params.append('change_type', changeType);
+                
+                const data = await fetchJSON(`/api/recent-changes?${params.toString()}`);
+                
+                hideLoading('changes-loading');
+                
+                const results = data.results || [];
+                document.getElementById('changes-count').textContent = `${results.length} changes`;
+                document.getElementById('changes-results-info').style.display = 'flex';
+                
+                createTable('changes-table', results, [
+                    { title: "Date", field: "change_date", headerFilter: true, sorter: "date" },
+                    { title: "PBS Code", field: "pbs_code", headerFilter: true },
+                    { title: "Drug Name", field: "drug_name", headerFilter: true, widthGrow: 2 },
+                    { title: "Change Type", field: "change_type", headerFilter: true },
+                    { title: "Description", field: "description", headerFilter: true, widthGrow: 2 }
+                ]);
+                
+            } catch (error) {
+                hideLoading('changes-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Raw Query
+        // ================================================================
+        async function executeRawQuery() {
+            const endpoint = document.getElementById('raw-endpoint').value;
+            const schedule = document.getElementById('raw-schedule').value.trim();
+            const limit = document.getElementById('raw-limit').value || 1000;
+            
+            showLoading('raw-loading');
+            document.getElementById('raw-results-info').style.display = 'none';
+            
+            try {
+                const params = new URLSearchParams({ limit: limit });
+                if (schedule) params.append('schedule_code', schedule);
+                
+                const csv = await fetchCSV(`/api/${endpoint}?${params.toString()}`);
+                const data = parseCSV(csv);
+                
+                hideLoading('raw-loading');
+                
+                document.getElementById('raw-count').textContent = `${data.length} rows`;
+                document.getElementById('raw-results-info').style.display = 'flex';
+                
+                // Auto-generate columns from data
+                const columns = data.length > 0 
+                    ? Object.keys(data[0]).map(k => ({ title: k, field: k, headerFilter: true }))
+                    : [];
+                
+                createTable('raw-table', data, columns);
+                
+            } catch (error) {
+                hideLoading('raw-loading');
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ================================================================
+        // Item Details Modal
+        // ================================================================
+        async function viewItemDetails(pbsCode) {
+            try {
+                const data = await fetchJSON(`/api/item-profile/${pbsCode}`);
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                const item = data.item || {};
+                document.getElementById('modal-title').textContent = 
+                    item.li_drug_name || item.drug_name || pbsCode;
+                
+                let html = '<div class="detail-section">';
+                html += '<h4>Basic Information</h4>';
+                html += '<div class="detail-grid">';
+                
+                const fields = ['pbs_code', 'drug_name', 'brand_name', 'schedule_code', 
+                               'listing_date', 'manufacturer_code'];
+                fields.forEach(f => {
+                    if (item[f]) {
+                        html += `<div class="detail-item"><label>${f}</label><span>${item[f]}</span></div>`;
+                    }
+                });
+                
+                html += '</div></div>';
+                
+                // ATC Codes
+                if (data.atc_codes?.length) {
+                    html += '<div class="detail-section"><h4>ATC Classifications</h4><div class="detail-grid">';
+                    data.atc_codes.forEach(atc => {
+                        html += `<div class="detail-item"><label>${atc.atc_code}</label><span>${atc.atc_name}</span></div>`;
+                    });
+                    html += '</div></div>';
+                }
+                
+                // Organisations
+                if (data.organisations?.length) {
+                    html += '<div class="detail-section"><h4>Organisations</h4><div class="detail-grid">';
+                    data.organisations.forEach(org => {
+                        html += `<div class="detail-item"><label>${org.relationship_type}</label><span>${org.organisation_name}</span></div>`;
+                    });
+                    html += '</div></div>';
+                }
+                
+                // Restrictions
+                if (data.restrictions?.length) {
+                    html += '<div class="detail-section"><h4>Restrictions</h4>';
+                    data.restrictions.forEach(r => {
+                        html += `<div class="detail-item" style="margin-bottom:10px;"><label>${r.restriction_code}</label><span>${r.restriction_text || 'See restriction details'}</span></div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                document.getElementById('modal-body').innerHTML = html;
+                document.getElementById('item-modal').classList.add('active');
+                
+                // Load price history
+                loadPriceHistoryChart(pbsCode);
+                
+            } catch (error) {
+                alert('Error loading details: ' + error.message);
+            }
+        }
+        
+        async function loadPriceHistoryChart(pbsCode) {
+            try {
+                const data = await fetchJSON(`/api/item-price-history/${pbsCode}`);
+                const events = data.events || [];
+                
+                if (events.length > 0) {
+                    let html = '<div class="detail-section"><h4>Price History</h4>';
+                    html += '<div class="chart-wrapper"><canvas id="modal-price-chart"></canvas></div></div>';
+                    document.getElementById('modal-body').innerHTML += html;
+                    
+                    // TODO: Render chart with price history data
+                }
+            } catch (error) {
+                console.error('Price history error:', error);
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('item-modal').classList.remove('active');
+        }
+        
+        // Close modal on overlay click
+        document.getElementById('item-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'item-modal') closeModal();
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+        
+        // ================================================================
+        // Initialize
+        // ================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>

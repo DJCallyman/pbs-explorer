@@ -14,7 +14,7 @@ class PBSAPIClient:
         self.subscription_key = settings.pbs.subscription_key
 
     def _headers(self) -> Dict[str, str]:
-        headers = {"Accept": "text/csv"}
+        headers = {"Accept": "application/json"}
         if self.subscription_key:
             headers["subscription-key"] = self.subscription_key
         return headers

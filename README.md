@@ -26,7 +26,7 @@ pip install -r requirements.txt
 You can override settings using environment variables (prefix `PBS_EXPLORER_`), for example:
 
 ```bash
-export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="<your-key>"
+export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="2384af7c667342ceb5a736fe29f1dc6b"
 export PBS_EXPLORER_DB_TYPE=sqlite
 export PBS_EXPLORER_DB_PATH=./pbs_data.db
 export PBS_EXPLORER_LOG_LEVEL=INFO

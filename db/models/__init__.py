@@ -11,7 +11,9 @@ from db.models.schedule import Schedule
 from db.models.relationships import (
     ItemATCRelationship,
     ItemOrganisationRelationship,
+    ItemPrescribingTextRelationship,
     ItemRestrictionRelationship,
+    RestrictionPrescribingTextRelationship,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "ItemATCRelationship",
     "ItemRestrictionRelationship",
     "ItemOrganisationRelationship",
+    "ItemPrescribingTextRelationship",
+    "RestrictionPrescribingTextRelationship",
 ]

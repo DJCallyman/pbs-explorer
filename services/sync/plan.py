@@ -7,9 +7,12 @@ from db.models import (
     Fee,
     Indication,
     Item,
+    ItemRestrictionRelationship,
+    ItemPrescribingTextRelationship,
     Organisation,
     PrescribingText,
     Restriction,
+    RestrictionPrescribingTextRelationship,
     Schedule,
 )
 
@@ -43,9 +46,8 @@ SYNC_PLAN = {
         "extra_fields": {"endpoint": "item-organisation-relationships"},
     },
     "item-restriction-relationships": {
-        "model": BaseReference,
-        "key_fields": ["id"],
-        "extra_fields": {"endpoint": "item-restriction-relationships"},
+        "model": ItemRestrictionRelationship,
+        "key_fields": ["pbs_code", "res_code", "schedule_code"],
     },
     "item-dispensing-rule-relationships": {
         "model": BaseReference,
@@ -53,14 +55,12 @@ SYNC_PLAN = {
         "extra_fields": {"endpoint": "item-dispensing-rule-relationships"},
     },
     "item-prescribing-text-relationships": {
-        "model": BaseReference,
-        "key_fields": ["id"],
-        "extra_fields": {"endpoint": "item-prescribing-text-relationships"},
+        "model": ItemPrescribingTextRelationship,
+        "key_fields": ["pbs_code", "prescribing_txt_id", "schedule_code"],
     },
     "restriction-prescribing-text-relationships": {
-        "model": BaseReference,
-        "key_fields": ["id"],
-        "extra_fields": {"endpoint": "restriction-prescribing-text-relationships"},
+        "model": RestrictionPrescribingTextRelationship,
+        "key_fields": ["res_code", "prescribing_txt_id", "schedule_code"],
     },
     "criteria-parameter-relationships": {
         "model": BaseReference,

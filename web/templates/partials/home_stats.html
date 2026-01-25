@@ -3,8 +3,3 @@
   <div class="stat-card">Latest Schedule: <span id="latest-schedule">{{ latest_schedule }}</span></div>
   <div class="stat-card">Last Sync: <span id="last-sync">{{ last_sync }}</span></div>
 </div>
-<script>
-  document.body.addEventListener('htmx:afterSwap', (e) => {
-    if (e.detail.target.id === 'home-stats') htmx.trigger(e.detail.target, 'load');
-  });
-</script>

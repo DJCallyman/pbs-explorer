@@ -9,12 +9,32 @@ from db.models.prescribing_text import PrescribingText
 from db.models.restriction import Restriction
 from db.models.schedule import Schedule
 from db.models.relationships import (
-    ItemATCRelationship,
+    ItemAtcRelationship,
     ItemOrganisationRelationship,
     ItemPrescribingTextRelationship,
     ItemRestrictionRelationship,
     RestrictionPrescribingTextRelationship,
+    ItemDispensingRuleRelationship,
+    CriteriaParameterRelationship,
+    ContainerOrganisationRelationship,
+    ExtPrepSfpRelationship,
+    ProgramDispensingRule,
 )
+from db.models.program import Program
+from db.models.container import Container
+from db.models.dispensing_rule import DispensingRule
+from db.models.criterion import Criterion
+from db.models.parameter import Parameter
+from db.models.prescriber import Prescriber
+from db.models.markup_band import MarkupBand
+from db.models.extemporaneous_tariff import ExtemporaneousTariff
+from db.models.extemporaneous_ingredient import ExtemporaneousIngredient
+from db.models.extemporaneous_preparation import ExtemporaneousPreparation
+from db.models.standard_formula_preparation import StandardFormulaPreparation
+from db.models.summary_of_change import SummaryOfChange
+from db.models.item_pricing_event import ItemPricingEvent
+from db.models.amt_item import AMTItem
+from db.models.sync_state import SyncState
 
 __all__ = [
     "Schedule",
@@ -27,9 +47,29 @@ __all__ = [
     "Copayment",
     "Fee",
     "BaseReference",
-    "ItemATCRelationship",
+    "ItemAtcRelationship",
     "ItemRestrictionRelationship",
     "ItemOrganisationRelationship",
     "ItemPrescribingTextRelationship",
     "RestrictionPrescribingTextRelationship",
+    "ItemDispensingRuleRelationship",
+    "CriteriaParameterRelationship",
+    "ContainerOrganisationRelationship",
+    "ExtPrepSfpRelationship",
+    "ProgramDispensingRule",
+    "Program",
+    "Container",
+    "DispensingRule",
+    "Criterion",
+    "Parameter",
+    "Prescriber",
+    "MarkupBand",
+    "ExtemporaneousTariff",
+    "ExtemporaneousIngredient",
+    "ExtemporaneousPreparation",
+    "StandardFormulaPreparation",
+    "SummaryOfChange",
+    "ItemPricingEvent",
+    "AMTItem",
+    "SyncState",
 ]

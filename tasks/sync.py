@@ -21,7 +21,7 @@ logging.basicConfig(
 async def run_sync() -> None:
     with get_session() as session:
         orchestrator = SyncOrchestrator(session)
-        await orchestrator.sync_all(SYNC_PLAN)
+        await orchestrator.sync_all_full()
 
 
 if __name__ == "__main__":

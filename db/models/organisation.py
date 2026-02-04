@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, String, TIMESTAMP
+from sqlalchemy import Column, Integer, String, TIMESTAMP, PrimaryKeyConstraint
 
 from db.base import Base
 
 
 class Organisation(Base):
     __tablename__ = "organisation"
+    __table_args__ = (
+        PrimaryKeyConstraint('organisation_id', 'schedule_code'),
+    )
 
-    organisation_id = Column(Integer, primary_key=True)
+    organisation_id = Column(Integer, nullable=False)
+    schedule_code = Column(String(20))
     name = Column(String(500))
     abn = Column(String(20))
     street_address = Column(String(500))

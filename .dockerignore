@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database (don't include in image - will be mounted)
+*.db
+pbs_data.db
+
+# Environment variables (never include secrets!)
+.env
+.env.local
+
+# Logs
+*.log
+app.log
+
+# Debug files
+debug_summary_changes.py
+summary_changes_debug.csv
+
+# Backup
+backup/
+
+# Git
+.git/
+.gitignore
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation (not needed in image)
+*.md
+DESIGN.md
+api-summary.md
+
+# Docker files (not needed in image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# GitHub Actions (not needed in image)
+.github/
+
+# Alembic versions (optional - migrations can be run separately)
+# Uncomment if you don't want migrations in the image
+# alembic/versions/
+
+# Tests (not needed in production image)
+tests/
+pytest.ini
+
+# Large data files
+pbs-api-public-v3.yaml

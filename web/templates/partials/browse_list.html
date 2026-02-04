@@ -1,0 +1,13 @@
+<ul class="browse-list">
+  {% for item in items %}
+    <li>
+      {% if type == "atc" %}
+        <a href="#">{{ item.atc_code }} - {{ item.atc_description }}</a> ({{ item.atc_level }})
+      {% elif type == "program" %}
+        {{ item.program_code }}: {{ item.count }} items
+      {% elif type == "manufacturer" %}
+        {{ item.name }}: {{ item.count }} items
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>

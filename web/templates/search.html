@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h2>Search</h2>
+  <form class="search-form" hx-get="/web/items" hx-target="#results" hx-swap="innerHTML" hx-indicator="#loading">
+    <input type="text" name="drug_name" placeholder="Drug name" />
+    <input type="text" name="brand_name" placeholder="Brand name" />
+    <input type="text" name="pbs_code" placeholder="PBS code" />
+    <select name="program_code">
+      <option value="">All Programs</option>
+      <option value="GE">General Schedule</option>
+      <option value="RP">Repatriation</option>
+    </select>
+    <select name="benefit_type_code">
+      <option value="">All Benefit Types</option>
+      <option value="U">Unrestricted</option>
+      <option value="R">Restricted</option>
+      <option value="A">Authority Required</option>
+      <option value="S">Streamlined</option>
+    </select>
+    <input type="text" name="indication" placeholder="Indication" />
+    <input type="text" name="severity" placeholder="Severity" />
+    <button type="submit">Search</button>
+    <button type="reset">Clear</button>
+  </form>
+  <div id="loading" class="htmx-indicator">Searching...</div>
+  <div id="results" class="results"></div>
+  <div id="report-section" style="display: none; margin-top: 1rem;">
+    <button type="button" class="btn btn-primary" onclick="viewPBSReport()">
+      View Medicare Statistics Report
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="copyReportURL()" style="margin-left: 0.5rem;">
+      Copy Report URL
+    </button>
+  </div>
+</section>
+
+<script>
+function getPBSReportURL() {
+  const pbsCodes = [];
+  let firstListedDate = null;
+  
+  document.querySelectorAll('#results tbody tr').forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 4) {
+      const pbsCode = cells[2].textContent.trim();
+      const listedDate = cells[3].textContent.trim();
+      
+      if (pbsCode) {
+        pbsCodes.push(pbsCode);
+      }
+      if (!firstListedDate && listedDate) {
+        firstListedDate = listedDate;
+      }
+    }
+  });
+  
+  if (pbsCodes.length === 0) {
+    alert('No results to generate report for');
+    return null;
+  }
+  
+  let startDate = "202501";
+  if (firstListedDate) {
+    const parsed = new Date(firstListedDate);
+    if (!isNaN(parsed)) {
+      startDate = parsed.toISOString().slice(0, 7).replace('-', '');
+    }
+  }
+  
+  const endDate = "202511";
+  
+  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const params = new URLSearchParams({
+    pbs_codes: itemlst,
+    start_date: startDate,
+    end_date: endDate
+  });
+  
+  return '/web/pbs-report?' + params.toString();
+}
+
+function getDirectReportURL() {
+  const pbsCodes = [];
+  let firstListedDate = null;
+  
+  document.querySelectorAll('#results tbody tr').forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 4) {
+      const pbsCode = cells[2].textContent.trim();
+      const listedDate = cells[3].textContent.trim();
+      
+      if (pbsCode) {
+        pbsCodes.push(pbsCode);
+      }
+      if (!firstListedDate && listedDate) {
+        firstListedDate = listedDate;
+      }
+    }
+  });
+  
+  if (pbsCodes.length === 0) {
+    return null;
+  }
+  
+  let startDate = "202501";
+  if (firstListedDate) {
+    const parsed = new Date(firstListedDate);
+    if (!isNaN(parsed)) {
+      startDate = parsed.toISOString().slice(0, 7).replace('-', '');
+    }
+  }
+  
+  const baseURL = 'https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest';
+  const program = 'SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report';
+  
+  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const encodedProgram = encodeURIComponent(program);
+  const encodedItemlst = encodeURIComponent(itemlst);
+  
+  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + pbsCodes.length + '&VAR=SERVICES&RPT_FMT=2&start_dt=' + startDate + '&end_dt=202511';
+}
+
+function viewPBSReport() {
+  const url = getPBSReportURL();
+  if (url) {
+    window.open(url, '_blank');
+  }
+}
+
+function copyReportURL() {
+  const url = getDirectReportURL();
+  if (url) {
+    navigator.clipboard.writeText(url).then(() => {
+      alert('URL copied! Paste it directly into a new browser tab.');
+    }).catch(() => {
+      prompt('Copy this URL:', url);
+    });
+  }
+}
+
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  if (e.detail.target.id === 'results') {
+    const reportSection = document.getElementById('report-section');
+    const hasResults = document.querySelectorAll('#results tbody tr').length > 0;
+    reportSection.style.display = hasResults ? 'block' : 'none';
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PBS Explorer</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/htmx.min.js"></script>
+    <script src="/static/app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>PBS Explorer</h1>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/search">Search</a>
+        <a href="/browse">Browse</a>
+        <a href="/reports">Reports</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </header>
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

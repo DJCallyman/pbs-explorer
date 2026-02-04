@@ -1,0 +1,34 @@
+<table class="results-table">
+  <thead>
+    <tr>
+      <th>Drug Name</th>
+      <th>Brand</th>
+      <th>PBS Code</th>
+      <th>First Listed</th>
+      <th>Program</th>
+      <th>Benefit Type</th>
+      <th>Price</th>
+      <th>Max Amount</th>
+      <th>Prescribing Type</th>
+      <th>Indications</th>
+      <th>Severity</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+      <tr>
+        <td>{{ item.drug_name }}</td>
+        <td>{{ item.brand_name }}</td>
+        <td>{{ item.pbs_code }}</td>
+        <td>{{ item.first_listed_date }}</td>
+        <td>{{ item.program_code }}</td>
+        <td>{{ item.benefit_type_code }}</td>
+        <td>{{ item.determined_price }}</td>
+        <td>{{ item.maximum_amount }}</td>
+        <td>{{ item.prescribing_type }}</td>
+        <td>{{ item.indications }}</td>
+        <td>{{ item.severity }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>

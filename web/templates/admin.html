@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section>
+  <h2>Admin</h2>
+  <div class="admin-actions">
+    <button hx-post="/api/v1/admin/sync/trigger" hx-target="#sync-status" hx-swap="outerHTML">
+      Trigger Sync
+    </button>
+    <button hx-post="/api/v1/admin/sync/latest" hx-target="#sync-status" hx-swap="outerHTML">
+      Sync Latest Only
+    </button>
+    <button hx-post="/api/v1/admin/cache/clear" hx-target="#sync-status" hx-swap="outerHTML">
+      Clear Cache
+    </button>
+  </div>
+  <div class="admin-status">
+    <p>
+      Sync Status: <span id="sync-status" hx-get="/api/v1/admin/sync/status" hx-trigger="load, every 10s">
+        loading
+      </span>
+    </p>
+  </div>
+</section>
+{% endblock %}

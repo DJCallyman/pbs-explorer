@@ -1,44 +1,157 @@
-# PBS API Frontend
+# PBS Explorer
 
-A basic HTML frontend for interacting with the PBS (Pharmaceutical Benefits Scheme) Public Data API.
+PBS Explorer is a FastAPI-based platform for exploring Australian PBS data with a searchable API and a lightweight HTMX-style UI.
 
-## Overview
+## Project Structure
 
-This frontend allows you to query various endpoints of the PBS API, which provides data on subsidized medicines in Australia. The API returns data in CSV format.
+- `api/` - API routers and schemas
+- `db/` - SQLAlchemy base and models
+- `services/` - sync and parsing services
+- `web/` - HTML templates and static assets
+- `tasks/` - runnable tasks (sync/bootstrap)
+- `tests/` - tests
 
-## Features
+## Setup
 
-- Dropdown to select API endpoints
-- Optional parameters: schedule_code and limit
-- Displays response data in a scrollable text area
+Create a virtual environment and install dependencies:
 
-## Usage
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-1. Run the local server: `python3 server.py`
-2. Open `http://localhost:8000` in a web browser.
-3. Select an endpoint from the dropdown.
-4. Optionally enter a schedule code (e.g., 3922) and/or limit the number of results (defaults to 100,000 if not specified).
-5. Click "Fetch Data" to make the API call.
-6. View the CSV response in the area below.
+## Configure Environment
 
-## API Details
+You can override settings using environment variables (prefix `PBS_EXPLORER_`), for example:
 
-- Base URL: `https://data-api.health.gov.au/pbs/api/v3/`
-- Authentication: Uses a subscription key in the header.
-- Response Format: CSV
+```bash
+export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="2384af7c667342ceb5a736fe29f1dc6b"
+export PBS_EXPLORER_DB_TYPE=sqlite
+export PBS_EXPLORER_DB_PATH=./pbs_data.db
+export PBS_EXPLORER_LOG_LEVEL=INFO
+```
 
-## Troubleshooting
+## Bootstrap Database
 
-- **CORS Errors**: The server now proxies API requests to avoid CORS issues. If you still encounter problems, ensure the server is running and try a hard refresh.
-- **API Key**: The subscription key is handled server-side for security.
-- **Large Responses**: Some endpoints return large datasets. Use the limit parameter to restrict results.
-- **Network Issues**: Ensure you have internet access and the API is available.
+```bash
+python -m tasks.bootstrap_db
+```
 
-## Endpoints
+## Run API Server
 
-See the dropdown in the app for all available endpoints. Key ones include:
-- `/schedules`: Get PBS schedules
-- `/items`: Get PBS items (medicines)
-- `/restrictions`: Get prescribing restrictions
+```bash
+uvicorn main:app --reload
+```
 
-For full API documentation, refer to the official PBS API docs.
+## Run Sync Task
+
+```bash
+python -m tasks.sync
+```
+
+## Docker Deployment
+
+### Quick Start (End Users)
+
+The easiest way to run PBS Explorer is using Docker Compose:
+
+1. **Create a directory for the application:**
+   ```bash
+   mkdir pbs-explorer
+   cd pbs-explorer
+   ```
+
+2. **Download the docker-compose file:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/djcallyman/pbs-explorer/main/docker-compose.yml
+   ```
+
+3. **Create environment file:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/djcallyman/pbs-explorer/main/.env.example -o .env
+   # Edit .env and add your PBS subscription key
+   nano .env
+   ```
+
+4. **Start the container:**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access the application:**
+   Open http://localhost:8000 in your browser
+
+### Manual Docker Build
+
+```bash
+docker build -t pbs-explorer .
+docker run -p 8000:8000 -e PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=... pbs-explorer
+```
+
+### Docker Compose (Production)
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env with your PBS subscription key
+nano .env
+
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Database Persistence
+
+The Docker container stores the SQLite database in `/app/data/`. Mount a volume to persist data:
+
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+### Reverse Proxy Setup
+
+If using Nginx Proxy Manager or similar:
+
+1. Point your domain to the container (port 8000)
+2. Enable WebSocket support if needed
+3. Health check endpoint: `/api/v1/health`
+
+## Database Migrations
+
+Migrations must be run manually:
+
+```bash
+# Inside the container
+docker exec -it pbs-explorer alembic upgrade head
+
+# Or locally with the database
+alembic upgrade head
+```
+
+## Sync Task
+
+To sync PBS data:
+
+```bash
+# Inside the container
+docker exec -it pbs-explorer python -m tasks.sync
+
+# Or locally
+python -m tasks.sync
+```
+
+## Notes
+
+- SQLite is used by default; update environment variables for PostgreSQL.
+- Health endpoint is available at `/api/v1/health`.
+- The container supports both AMD64 and ARM64 architectures (MacBook, Raspberry Pi, etc.).
+- Pre-built images are available at `ghcr.io/djcallyman/pbs-explorer:latest`.

@@ -2,24 +2,425 @@
 
 {% block content %}
 <section>
-  <h2>Admin</h2>
-  <div class="admin-actions">
-    <button hx-post="/api/v1/admin/sync/trigger" hx-target="#sync-status" hx-swap="outerHTML">
-      Trigger Sync
-    </button>
-    <button hx-post="/api/v1/admin/sync/latest" hx-target="#sync-status" hx-swap="outerHTML">
-      Sync Latest Only
-    </button>
-    <button hx-post="/api/v1/admin/cache/clear" hx-target="#sync-status" hx-swap="outerHTML">
-      Clear Cache
-    </button>
+  <h2>Admin Dashboard</h2>
+
+  <div class="admin-card">
+    <h3>Schedule Status</h3>
+    <div id="schedule-status" 
+         hx-get="/api/v1/admin/sync/schedules" 
+         hx-trigger="load, every 60s"
+         class="json-target"
+         data-type="schedules">
+      <p class="loading">Loading...</p>
+    </div>
   </div>
-  <div class="admin-status">
-    <p>
-      Sync Status: <span id="sync-status" hx-get="/api/v1/admin/sync/status" hx-trigger="load, every 10s">
-        loading
-      </span>
-    </p>
+
+  <div class="admin-card">
+    <h3>Sync Estimate</h3>
+    <div id="sync-estimate" 
+         hx-get="/api/v1/admin/sync/estimate" 
+         hx-trigger="load"
+         class="json-target"
+         data-type="estimate">
+      <p class="loading">Calculating...</p>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Sync Operations</h3>
+    <div class="sync-actions">
+      <div class="sync-action">
+        <h4>Full Sync</h4>
+        <p>Syncs all 34 endpoints with complete data. Use when first setting up or after extended period without sync.</p>
+        <button class="btn-primary" onclick="runFullSync()">
+          Run Full Sync
+        </button>
+      </div>
+
+      <div class="sync-action">
+        <h4>Incremental Sync</h4>
+        <p>Syncs only changes since last sync using the summary-of-changes endpoint. Much faster than full sync.</p>
+        <button class="btn-secondary" onclick="runIncrementalSync()">
+          Run Incremental Sync
+        </button>
+      </div>
+    </div>
+    <div id="sync-result"></div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Sync Specific Endpoints</h3>
+    <div id="endpoints-list"
+         hx-get="/api/v1/admin/sync/endpoints"
+         hx-trigger="load"
+         class="json-target"
+         data-type="endpoints">
+      <p class="loading">Loading endpoints...</p>
+    </div>
+    <div id="endpoint-sync-result"></div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Sync Status</h3>
+    <div id="sync-status" 
+         hx-get="/api/v1/admin/sync/status" 
+         hx-trigger="load, every 10s"
+         class="json-target"
+         data-type="status">
+      <p class="loading">Loading...</p>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h3>Sync History</h3>
+    <div id="sync-history" 
+         hx-get="/api/v1/admin/sync/history" 
+         hx-trigger="load, every 30s"
+         class="json-target"
+         data-type="history">
+      <p class="loading">Loading...</p>
+    </div>
   </div>
 </section>
+
+<script>
+async function runFullSync() {
+  if (!confirm('This will run a full sync of all data from the PBS API. This may take 5-10 minutes. Continue?')) return;
+  document.getElementById('sync-result').innerHTML = '<div class="loading">Running full sync...</div>';
+  try {
+    const response = await fetch('/api/v1/admin/sync/full', { method: 'POST' });
+    const data = await response.json();
+    document.getElementById('sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
+    refreshAll();
+  } catch (e) {
+    document.getElementById('sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+  }
+}
+
+async function runIncrementalSync() {
+  if (!confirm('This will run an incremental sync to fetch only changes. Continue?')) return;
+  document.getElementById('sync-result').innerHTML = '<div class="loading">Running incremental sync...</div>';
+  try {
+    const response = await fetch('/api/v1/admin/sync/incremental', { method: 'POST' });
+    const data = await response.json();
+    document.getElementById('sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
+    refreshAll();
+  } catch (e) {
+    document.getElementById('sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+  }
+}
+
+let availableEndpoints = [];
+
+async function runSelectedEndpoints() {
+  const checkboxes = document.querySelectorAll('.endpoint-checkbox:checked');
+  const selected = Array.from(checkboxes).map(cb => cb.value);
+  if (selected.length === 0) {
+    document.getElementById('endpoint-sync-result').innerHTML = '<div class="warning">Please select at least one endpoint.</div>';
+    return;
+  }
+  if (!confirm('This will sync ' + selected.length + ' endpoint(s). Continue?')) return;
+  document.getElementById('endpoint-sync-result').innerHTML = '<div class="loading">Running endpoint sync...</div>';
+  try {
+    const response = await fetch('/api/v1/admin/sync/endpoints', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoints: selected })
+    });
+    const data = await response.json();
+    document.getElementById('endpoint-sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
+    refreshAll();
+  } catch (e) {
+    document.getElementById('endpoint-sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+  }
+}
+
+function selectAllEndpoints() {
+  document.querySelectorAll('.endpoint-checkbox').forEach(cb => cb.checked = true);
+}
+
+function deselectAllEndpoints() {
+  document.querySelectorAll('.endpoint-checkbox').forEach(cb => cb.checked = false);
+}
+
+function refreshAll() {
+  document.getElementById('schedule-status').dispatchEvent(new Event('htmx:refresh'));
+  document.getElementById('sync-estimate').dispatchEvent(new Event('htmx:refresh'));
+  document.getElementById('sync-status').dispatchEvent(new Event('htmx:refresh'));
+  document.getElementById('sync-history').dispatchEvent(new Event('htmx:refresh'));
+  document.getElementById('endpoints-list').dispatchEvent(new Event('htmx:refresh'));
+}
+
+// Transform JSON to HTML after HTMX swap
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+  const target = evt.detail.target;
+  const content = target.textContent.trim();
+  
+  if (!target.classList.contains('json-target')) return;
+  if (!content.startsWith('{') && !content.startsWith('[')) return;
+  
+  try {
+    const data = JSON.parse(content);
+    const dataType = target.dataset.type;
+    let html = '';
+    
+    if (dataType === 'schedules') html = renderScheduleStatus(data);
+    else if (dataType === 'status') html = renderSyncStatus(data);
+    else if (dataType === 'history') html = renderSyncHistory(data);
+    else if (dataType === 'estimate') html = renderEstimate(data);
+    else if (dataType === 'endpoints') html = renderEndpoints(data);
+    
+    if (html) target.innerHTML = html;
+  } catch (e) {
+    // Keep original content on error
+  }
+});
+
+function renderScheduleStatus(data) {
+  if (data.error) {
+    return '<div class="error"><strong>Error:</strong> ' + data.error + '<br><small>' + (data.detail || '') + '</small></div>';
+  }
+  
+  let html = '<div class="status-grid">';
+  html += '<div class="status-item"><span class="label">Latest API Schedule</span><span class="value">' + (data.latest_api_schedule || 'Unknown') + '</span></div>';
+  html += '<div class="status-item"><span class="label">Current DB Schedule</span><span class="value">' + (data.current_db_schedule || 'Unknown') + '</span></div>';
+  html += '<div class="status-item"><span class="label">Needs Sync</span><span class="value ' + (data.needs_sync ? 'warning' : 'success') + '">' + (data.needs_sync ? 'Yes' : 'No') + '</span></div>';
+  html += '</div>';
+  
+  if (data.schedules && data.schedules.length > 0) {
+    html += '<div class="schedules-list"><h4>Available Schedules</h4><ul>';
+    data.schedules.forEach(s => {
+      html += '<li>Schedule ' + s.schedule_code + ' (' + (s.effective_date || 'No date') + ')</li>';
+    });
+    html += '</ul></div>';
+  }
+  return html;
+}
+
+function renderSyncStatus(data) {
+  let html = '<div class="status-grid">';
+  html += '<div class="status-item"><span class="label">Status</span><span class="value ' + (data.in_progress ? 'warning' : 'success') + '">' + (data.in_progress ? 'In Progress' : 'Idle') + '</span></div>';
+  
+  if (data.current_endpoint) {
+    html += '<div class="status-item"><span class="label">Current Endpoint</span><span class="value">' + data.current_endpoint + '</span></div>';
+  }
+  if (data.last_run_at) {
+    html += '<div class="status-item"><span class="label">Last Run</span><span class="value">' + new Date(data.last_run_at).toLocaleString() + '</span></div>';
+  }
+  if (data.records_processed !== undefined) {
+    html += '<div class="status-item"><span class="label">Records Processed</span><span class="value">' + data.records_processed.toLocaleString() + '</span></div>';
+  }
+  if (data.last_error) {
+    html += '<div class="status-item full-width error"><span class="label">Last Error</span><span class="value error">' + data.last_error + '</span></div>';
+  }
+  if (data.last_sync) {
+    html += '<div class="status-item"><span class="label">Last Sync Type</span><span class="value">' + (data.last_sync.type || 'Unknown') + '</span></div>';
+    html += '<div class="status-item"><span class="label">Last Sync At</span><span class="value">' + (data.last_sync.at ? new Date(data.last_sync.at).toLocaleString() : 'Never') + '</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderSyncHistory(data) {
+  if (!data.history || data.history.length === 0) {
+    return '<p>No sync history available.</p>';
+  }
+  
+  let html = '<table><thead><tr><th>Endpoint</th><th>Type</th><th>Fetched</th><th>Synced</th><th>Schedule</th><th>When</th></tr></thead><tbody>';
+  data.history.forEach(row => {
+    html += '<tr>';
+    html += '<td>' + row.endpoint + '</td>';
+    html += '<td><span class="badge ' + (row.sync_type || '').replace('_', '-') + '">' + (row.sync_type || 'unknown') + '</span></td>';
+    html += '<td>' + (row.records_fetched || '0') + '</td>';
+    html += '<td>' + (row.records_synced || '0') + '</td>';
+    html += '<td>' + (row.schedule_code || '-') + '</td>';
+    html += '<td>' + (row.last_synced_at ? new Date(row.last_synced_at).toLocaleString() : 'Never') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderEstimate(data) {
+  if (data.type === 'error') {
+    return '<div class="error"><strong>Error:</strong> ' + data.error + '<br><small>' + (data.message || '') + '</small></div>';
+  }
+  if (data.type === 'not_needed') {
+    return '<div class="success"><strong>Up to Date</strong><br>' + data.message + '</div>';
+  }
+  if (data.type === 'full_required') {
+    return '<div class="warning"><strong>Full Sync Required</strong><br>' + data.message + '<br><small>Estimated time: ' + (data.estimated_time || 'unknown') + '</small></div>';
+  }
+  
+  let html = '<div class="estimate">';
+  html += '<p><strong>Incremental Sync Available</strong><br>' + data.message + '</p>';
+  html += '<div class="estimate-stats">';
+  html += '<div class="stat"><span class="stat-value">' + (data.estimated_changes || '?') + '</span><span class="stat-label">Changes</span></div>';
+  html += '<div class="stat"><span class="stat-value">' + (data.estimated_time || '?') + '</span><span class="stat-label">Est. Time</span></div>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderEndpoints(data) {
+  if (!data.endpoints || data.endpoints.length === 0) {
+    return '<p>No endpoints available.</p>';
+  }
+  
+  let html = '<div class="endpoint-actions">';
+  html += '<button class="btn-secondary" onclick="selectAllEndpoints()">Select All</button>';
+  html += '<button class="btn-secondary" onclick="deselectAllEndpoints()">Deselect All</button>';
+  html += '</div>';
+  html += '<div class="endpoint-grid">';
+  
+  const sorted = [...data.endpoints].sort();
+  sorted.forEach((endpoint, idx) => {
+    html += '<label class="endpoint-item">';
+    html += '<input type="checkbox" class="endpoint-checkbox" value="' + endpoint + '">';
+    html += '<span>' + endpoint + '</span>';
+    html += '</label>';
+  });
+  
+  html += '</div>';
+  html += '<button class="btn-primary" style="margin-top: 1rem;" onclick="runSelectedEndpoints()">';
+  html += 'Sync Selected Endpoints</button>';
+  return html;
+}
+</script>
+
+<style>
+  .admin-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .admin-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 0.5rem;
+  }
+
+  .loading { color: #6c757d; font-style: italic; }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+
+  .status-item {
+    padding: 0.5rem 0.75rem;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 50px;
+  }
+
+  .status-item .label {
+    display: block;
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-bottom: 0.15rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+  }
+
+  .status-item .value {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    line-height: 1.2;
+  }
+
+  .status-item .value.success { color: #28a745; }
+  .status-item .value.warning { color: #f59e00; }
+  .status-item .value.error { color: #dc3545; }
+
+  .status-item.full-width { grid-column: 1 / -1; }
+
+  .error { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; }
+  .warning { background: #fff3cd; color: #856404; padding: 1rem; border-radius: 6px; }
+  .success { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; }
+
+  .sync-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+  .sync-action {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 1rem;
+  }
+
+  .sync-action h4 { margin: 0 0 0.5rem 0; color: #495057; }
+  .sync-action p { color: #6c757d; font-size: 0.85rem; margin-bottom: 1rem; line-height: 1.4; }
+
+  .btn-primary {
+    background: #007bff; color: white; border: none; padding: 0.6rem 1.2rem;
+    border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-weight: 500; width: 100%;
+  }
+  .btn-primary:hover { background: #0056b3; }
+
+  .btn-secondary {
+    background: #28a745; color: white; border: none; padding: 0.6rem 1.2rem;
+    border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-weight: 500; width: 100%;
+  }
+  .btn-secondary:hover { background: #1e7e34; }
+
+  #sync-result { margin-top: 1rem; padding: 1rem; border-radius: 6px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #e9ecef; }
+  th { background: #f8f9fa; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8f9fa; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge.full { background: #007bff; color: white; }
+  .badge.incremental { background: #28a745; color: white; }
+  .badge.incremental-fallback { background: #f59e00; color: white; }
+
+  .estimate { padding: 1rem; background: #e7f3ff; border-radius: 6px; }
+  .estimate p { margin: 0 0 0.5rem 0; }
+  .estimate-stats { display: flex; gap: 2rem; margin-top: 0.5rem; }
+  .stat { text-align: center; }
+  .stat-value { display: block; font-size: 1.5rem; font-weight: 700; color: #007bff; }
+  .stat-label { font-size: 0.75rem; color: #6c757d; text-transform: uppercase; }
+
+  .schedules-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6; }
+  .schedules-list h4 { margin: 0 0 0.5rem 0; font-size: 0.8rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+  .schedules-list ul { margin: 0; padding-left: 1.5rem; font-size: 0.85rem; max-height: 120px; overflow-y: auto; }
+  .schedules-list li { margin-bottom: 0.25rem; }
+
+  .endpoint-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .endpoint-actions .btn-secondary { width: auto; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+  .endpoint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; max-height: 300px; overflow-y: auto; padding: 0.5rem; background: #fff; border-radius: 6px; border: 1px solid #e9ecef; }
+  .endpoint-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem; cursor: pointer; }
+  .endpoint-item:hover { background: #f8f9fa; border-radius: 4px; }
+  .endpoint-item input { margin: 0; }
+  .endpoint-item span { font-size: 0.85rem; }
+  #endpoint-sync-result { margin-top: 1rem; }
+</style>
 {% endblock %}

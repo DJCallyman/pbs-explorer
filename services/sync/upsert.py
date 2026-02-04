@@ -33,6 +33,16 @@ def _generate_id(model, row: Dict[str, Any]) -> Optional[str]:
 def _filter_row(model, row: Dict[str, Any]) -> Dict[str, Any]:
     columns = {column.name for column in model.__table__.columns}
     filtered = {key: value for key, value in row.items() if key in columns}
+    
+    if not filtered and row:
+        import logging
+        logger = logging.getLogger("sync")
+        filtered_keys = set(row.keys())
+        model_columns = set(columns)
+        missing_in_model = filtered_keys - model_columns
+        if missing_in_model:
+            logger.debug(f"Row filtered out - no matching columns for model {model.__tablename__}. Row keys: {list(row.keys())[:10]}...")
+    
     if "data" in columns and "data" not in filtered:
         filtered["data"] = json.dumps(row, ensure_ascii=False)
     
@@ -41,11 +51,17 @@ def _filter_row(model, row: Dict[str, Any]) -> Dict[str, Any]:
     if generated_id:
         filtered["id"] = generated_id
     
-    # Convert string dates and timestamps to proper Python objects, and handle empty strings
+    # Convert dict fields to JSON strings for Text columns
+    # This handles table_keys, change_detail, previous_detail in SummaryOfChange
     for column in model.__table__.columns:
         col_name = column.name
         if col_name in filtered and filtered[col_name] is not None:
             value = filtered[col_name]
+            
+            # Convert dict to JSON string (for Text columns)
+            if isinstance(value, dict):
+                filtered[col_name] = json.dumps(value, ensure_ascii=False)
+                continue
             
             # Convert empty strings to None for numeric and date columns
             if isinstance(value, str) and value == "":
@@ -88,10 +104,17 @@ def upsert_rows(
         key_fields: Fields to identify existing rows (unused for merge but retained for interface).
         extra_fields: Extra fields to apply to every row (e.g., endpoint metadata).
     """
+    import logging
+    logger = logging.getLogger("sync")
+    
     count = 0
+    skipped = 0
     seen_keys = set()
+    total_rows = 0
+    none_key_count = 0
     
     for row in rows:
+        total_rows += 1
         filtered = _filter_row(model, row)
         if extra_fields:
             filtered.update(extra_fields)
@@ -99,11 +122,25 @@ def upsert_rows(
         # Skip duplicate rows within this batch by checking key fields
         # This prevents duplicate constraint violations when the API returns duplicates
         key_values = tuple(filtered.get(key) for key in key_fields)
+        
+        # Log if any key value is None
+        if None in key_values:
+            none_key_count += 1
+        
         if key_values in seen_keys:
+            skipped += 1
             continue
         seen_keys.add(key_values)
         
-        session.merge(model(**filtered))
-        count += 1
+        try:
+            session.merge(model(**filtered))
+            count += 1
+        except Exception as e:
+            logger.warning(f"Error merging row in {model.__tablename__}: {e}")
+            skipped += 1
+    
+    if total_rows > 0 and (skipped > 0 or count != total_rows):
+        logger.debug(f"upsert for {model.__tablename__}: total={total_rows}, inserted={count}, skipped={skipped}, none_key_rows={none_key_count}")
+    
     session.commit()
     return count

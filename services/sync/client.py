@@ -16,7 +16,7 @@ class PBSAPIClient:
     def _headers(self) -> Dict[str, str]:
         headers = {"Accept": "application/json"}
         if self.subscription_key:
-            headers["subscription-key"] = self.subscription_key
+            headers["Subscription-Key"] = self.subscription_key
         return headers
 
     async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:

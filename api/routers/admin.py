@@ -1,37 +1,243 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import AsyncGenerator, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from api.deps import get_db
 from services.sync.status_store import status_store
+from services.sync.orchestrator import SyncOrchestrator
+from services.sync.incremental import IncrementalSync
+from services.sync.plan import SYNC_PLAN
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
-@router.get("/sync/status")
-def sync_status() -> dict:
-    status = status_store.get()
-    if status is None:
-        return {"status": "idle"}
+class SyncEndpointsRequest(BaseModel):
+    endpoints: List[str]
+
+
+@router.get("/sync/endpoints")
+def list_endpoints() -> dict:
+    """List all available sync endpoints."""
     return {
-        "status": "in_progress" if status.in_progress else "idle",
-        "current_endpoint": status.current_endpoint,
-        "last_run_at": status.last_run_at.isoformat() if status.last_run_at else None,
-        "last_success_at": status.last_success_at.isoformat() if status.last_success_at else None,
-        "last_error": status.last_error,
-        "records_processed": status.records_processed,
+        "endpoints": list(SYNC_PLAN.keys()),
+        "count": len(SYNC_PLAN),
     }
 
 
-@router.post("/sync/trigger")
-def sync_trigger() -> dict:
-    return {"status": "accepted", "requested_at": datetime.utcnow().isoformat()}
+@router.get("/sync/status")
+def sync_status(db: Session = Depends(get_db)) -> dict:
+    orchestrator = SyncOrchestrator(db)
+    return orchestrator.get_sync_status()
 
 
-@router.post("/sync/latest")
-def sync_latest() -> dict:
-    return {"status": "accepted", "requested_at": datetime.utcnow().isoformat()}
+@router.get("/sync/history")
+def sync_history(db: Session = Depends(get_db)) -> dict:
+    orchestrator = SyncOrchestrator(db)
+    return {"history": orchestrator.get_sync_history()}
+
+
+@router.get("/sync/schedules")
+async def sync_schedules(db: Session = Depends(get_db)) -> dict:
+    """Get available schedules from API and current database state."""
+    orchestrator = SyncOrchestrator(db)
+    incremental = IncrementalSync(db)
+
+    try:
+        latest_api = await incremental.get_latest_schedule_code()
+    except Exception as e:
+        return {
+            "error": "Could not connect to PBS API",
+            "detail": str(e),
+            "latest_api_schedule": None,
+            "current_db_schedule": None,
+            "schedules": [],
+            "needs_sync": True,
+        }
+
+    current_db = await incremental.get_current_db_schedule()
+
+    from sqlalchemy import select
+    from db.models import Schedule
+    from sqlalchemy import desc
+
+    result = db.execute(select(Schedule).order_by(desc(Schedule.effective_date)))
+    schedules = []
+    for row in result.scalars():
+        schedules.append({
+            "schedule_code": row.schedule_code,
+            "effective_date": row.effective_date.isoformat() if row.effective_date else None,
+            "revision_number": row.revision_number,
+        })
+
+    return {
+        "latest_api_schedule": latest_api,
+        "current_db_schedule": current_db,
+        "schedules": schedules,
+        "needs_sync": latest_api != current_db if latest_api and current_db else True,
+    }
+
+
+@router.post("/sync/full")
+async def sync_full(db: Session = Depends(get_db)) -> dict:
+    """Trigger a full sync of all endpoints."""
+    existing_status = status_store.get()
+    if existing_status and existing_status.in_progress:
+        raise HTTPException(status_code=409, detail="Sync already in progress")
+
+    async def run_sync():
+        orchestrator = SyncOrchestrator(db)
+        try:
+            await orchestrator.sync_all_full()
+        except Exception as e:
+            # Get the status again in case it changed
+            task_status = status_store.get()
+            if task_status:
+                task_status.last_error = str(e)
+                task_status.in_progress = False
+
+    asyncio.create_task(run_sync())
+
+    return {
+        "status": "accepted",
+        "type": "full",
+        "requested_at": datetime.utcnow().isoformat(),
+        "message": "Full sync started in background. Check status endpoint for progress.",
+    }
+
+
+@router.post("/sync/endpoints")
+async def sync_endpoints(request: SyncEndpointsRequest, db: Session = Depends(get_db)) -> dict:
+    """Trigger a sync of specific endpoints only."""
+    existing_status = status_store.get()
+    if existing_status and existing_status.in_progress:
+        raise HTTPException(status_code=409, detail="Sync already in progress")
+
+    # Validate endpoints
+    invalid_endpoints = [e for e in request.endpoints if e not in SYNC_PLAN]
+    if invalid_endpoints:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid endpoints: {invalid_endpoints}. Valid endpoints: {list(SYNC_PLAN.keys())}",
+        )
+
+    async def run_sync():
+        orchestrator = SyncOrchestrator(db)
+        try:
+            await orchestrator.sync_endpoints(request.endpoints)
+        except Exception as e:
+            task_status = status_store.get()
+            if task_status:
+                task_status.last_error = str(e)
+                task_status.in_progress = False
+
+    asyncio.create_task(run_sync())
+
+    return {
+        "status": "accepted",
+        "type": "endpoints",
+        "endpoints": request.endpoints,
+        "requested_at": datetime.utcnow().isoformat(),
+        "message": f"Sync of {len(request.endpoints)} endpoint(s) started in background. Check status endpoint for progress.",
+    }
+
+
+@router.post("/sync/incremental")
+async def sync_incremental(db: Session = Depends(get_db)) -> dict:
+    """Trigger an incremental sync using summary-of-changes."""
+    existing_status = status_store.get()
+    if existing_status and existing_status.in_progress:
+        raise HTTPException(status_code=409, detail="Sync already in progress")
+
+    async def run_sync():
+        orchestrator = SyncOrchestrator(db)
+        try:
+            await orchestrator.sync_all_incremental()
+        except Exception as e:
+            task_status = status_store.get()
+            if task_status:
+                task_status.last_error = str(e)
+                task_status.in_progress = False
+
+    asyncio.create_task(run_sync())
+
+    return {
+        "status": "accepted",
+        "type": "incremental",
+        "requested_at": datetime.utcnow().isoformat(),
+        "message": "Incremental sync started in background. Check status endpoint for progress.",
+    }
+
+
+@router.get("/sync/estimate")
+async def sync_estimate(db: Session = Depends(get_db)) -> dict:
+    """Get estimate of what an incremental sync would process."""
+    incremental = IncrementalSync(db)
+
+    try:
+        latest_api = await incremental.get_latest_schedule_code()
+    except Exception as e:
+        return {
+            "type": "error",
+            "error": "Could not connect to PBS API",
+            "detail": str(e),
+            "message": "Check your API subscription key configuration.",
+        }
+
+    current_db = await incremental.get_current_db_schedule()
+
+    if not latest_api:
+        return {
+            "type": "error",
+            "error": "No schedule data returned",
+            "message": "The API returned no schedule data.",
+        }
+
+    if not current_db:
+        return {
+            "type": "full_required",
+            "message": "No data in database. A full sync is required.",
+            "estimated_time": "5-10 minutes",
+            "estimated_records": "2-3 million",
+        }
+
+    if latest_api == current_db:
+        return {
+            "type": "not_needed",
+            "message": f"Database is already at the latest schedule ({latest_api}).",
+            "current_schedule": current_db,
+            "latest_schedule": latest_api,
+        }
+
+    try:
+        changes_response = await incremental.client.get(
+            "/summary-of-changes",
+            params={
+                "filter": f"source_schedule_code eq {current_db}",
+                "limit": 1,
+            },
+        )
+
+        from services.sync.parser import parse_json
+        changes, meta = parse_json(changes_response.text)
+        total_changes = meta.get("_meta", {}).get("total_records", "unknown")
+    except Exception:
+        total_changes = "unknown"
+
+    return {
+        "type": "incremental",
+        "message": f"Schedule {current_db} -> {latest_api}",
+        "source_schedule": current_db,
+        "target_schedule": latest_api,
+        "estimated_changes": total_changes,
+        "estimated_time": "1-5 minutes" if total_changes and total_changes != "unknown" else "seconds",
+    }
 
 
 @router.post("/cache/clear")

@@ -6,6 +6,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 
 class PBSSettings(BaseModel):
     api_base_url: str = Field(default="https://data-api.health.gov.au/pbs/api/v3")
@@ -13,16 +19,8 @@ class PBSSettings(BaseModel):
 
 
 class SyncSettings(BaseModel):
-    check_on_startup: bool = True
+    check_on_startup: bool = False
     force_refresh_on_startup: bool = False
-    auto_sync_enabled: bool = True
-    auto_sync_interval_hours: int = 24
-    max_data_age_days: int = 30
-    sync_latest_only: bool = False
-    batch_size: int = 1000
-    max_concurrent_requests: int = 5
-    use_cache: bool = False
-    cache_ttl_seconds: int = 3600
 
 
 class DatabaseSettings(BaseModel):
@@ -95,18 +93,6 @@ def get_settings() -> Settings:
     settings.sync.force_refresh_on_startup = _get_bool(
         "SYNC_FORCE_REFRESH_ON_STARTUP", settings.sync.force_refresh_on_startup
     )
-    settings.sync.auto_sync_enabled = _get_bool("SYNC_AUTO_ENABLED", settings.sync.auto_sync_enabled)
-    settings.sync.auto_sync_interval_hours = _get_int(
-        "SYNC_AUTO_INTERVAL_HOURS", settings.sync.auto_sync_interval_hours
-    )
-    settings.sync.max_data_age_days = _get_int("SYNC_MAX_DATA_AGE_DAYS", settings.sync.max_data_age_days)
-    settings.sync.sync_latest_only = _get_bool("SYNC_LATEST_ONLY", settings.sync.sync_latest_only)
-    settings.sync.batch_size = _get_int("SYNC_BATCH_SIZE", settings.sync.batch_size)
-    settings.sync.max_concurrent_requests = _get_int(
-        "SYNC_MAX_CONCURRENT_REQUESTS", settings.sync.max_concurrent_requests
-    )
-    settings.sync.use_cache = _get_bool("SYNC_USE_CACHE", settings.sync.use_cache)
-    settings.sync.cache_ttl_seconds = _get_int("SYNC_CACHE_TTL_SECONDS", settings.sync.cache_ttl_seconds)
 
     settings.database.type = _get_env("DB_TYPE", settings.database.type) or "sqlite"
     settings.database.path = _get_env("DB_PATH", settings.database.path) or "pbs_data.db"

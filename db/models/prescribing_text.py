@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, String, TIMESTAMP
+from sqlalchemy import Column, Integer, String, TIMESTAMP, PrimaryKeyConstraint
 
 from db.base import Base
 
 
 class PrescribingText(Base):
     __tablename__ = "prescribing_text"
+    __table_args__ = (
+        PrimaryKeyConstraint('prescribing_txt_id', 'schedule_code'),
+    )
 
-    prescribing_txt_id = Column(Integer, primary_key=True)
+    prescribing_txt_id = Column(Integer, nullable=False)
+    schedule_code = Column(String(20))
     prescribing_txt = Column(String)
     prescribing_type = Column(String(100))
     complex_authority_rqrd_ind = Column(String(1))

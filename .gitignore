@@ -51,6 +51,14 @@ pbs_data.db
 
 # Logs
 *.log
+app.log
+
+# Debug files
+debug_summary_changes.py
+summary_changes_debug.csv
+
+# Backup
+backup/
 
 
 # VSCode

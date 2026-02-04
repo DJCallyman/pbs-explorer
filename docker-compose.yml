@@ -2,13 +2,21 @@ version: "3.9"
 
 services:
   pbs-explorer:
-    build: .
+    image: ghcr.io/djcallyman/pbs-explorer:latest
+    container_name: pbs-explorer
     ports:
       - "8000:8000"
     environment:
       - PBS_EXPLORER_DB_TYPE=sqlite
-      - PBS_EXPLORER_DB_PATH=/app/pbs_data.db
+      - PBS_EXPLORER_DB_PATH=/app/data/pbs_data.db
       - PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=${PBS_EXPLORER_PBS_SUBSCRIPTION_KEY}
       - PBS_EXPLORER_LOG_LEVEL=INFO
     volumes:
-      - ./pbs_data.db:/app/pbs_data.db
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

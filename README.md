@@ -50,14 +50,108 @@ uvicorn main:app --reload
 python -m tasks.sync
 ```
 
-## Docker
+## Docker Deployment
+
+### Quick Start (End Users)
+
+The easiest way to run PBS Explorer is using Docker Compose:
+
+1. **Create a directory for the application:**
+   ```bash
+   mkdir pbs-explorer
+   cd pbs-explorer
+   ```
+
+2. **Download the docker-compose file:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/djcallyman/pbs-explorer/main/docker-compose.yml
+   ```
+
+3. **Create environment file:**
+   ```bash
+   curl -O https://raw.githubusercontent.com/djcallyman/pbs-explorer/main/.env.example -o .env
+   # Edit .env and add your PBS subscription key
+   nano .env
+   ```
+
+4. **Start the container:**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access the application:**
+   Open http://localhost:8000 in your browser
+
+### Manual Docker Build
 
 ```bash
 docker build -t pbs-explorer .
 docker run -p 8000:8000 -e PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=... pbs-explorer
 ```
 
+### Docker Compose (Production)
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env with your PBS subscription key
+nano .env
+
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Database Persistence
+
+The Docker container stores the SQLite database in `/app/data/`. Mount a volume to persist data:
+
+```yaml
+volumes:
+  - ./data:/app/data
+```
+
+### Reverse Proxy Setup
+
+If using Nginx Proxy Manager or similar:
+
+1. Point your domain to the container (port 8000)
+2. Enable WebSocket support if needed
+3. Health check endpoint: `/api/v1/health`
+
+## Database Migrations
+
+Migrations must be run manually:
+
+```bash
+# Inside the container
+docker exec -it pbs-explorer alembic upgrade head
+
+# Or locally with the database
+alembic upgrade head
+```
+
+## Sync Task
+
+To sync PBS data:
+
+```bash
+# Inside the container
+docker exec -it pbs-explorer python -m tasks.sync
+
+# Or locally
+python -m tasks.sync
+```
+
 ## Notes
 
 - SQLite is used by default; update environment variables for PostgreSQL.
 - Health endpoint is available at `/api/v1/health`.
+- The container supports both AMD64 and ARM64 architectures (MacBook, Raspberry Pi, etc.).
+- Pre-built images are available at `ghcr.io/djcallyman/pbs-explorer:latest`.

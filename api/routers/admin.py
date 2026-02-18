@@ -46,6 +46,9 @@ def sync_history(db: Session = Depends(get_db)) -> dict:
 @router.get("/sync/schedules")
 async def sync_schedules(db: Session = Depends(get_db)) -> dict:
     """Get available schedules from API and current database state."""
+    from sqlalchemy import select, func, desc
+    from db.models import Schedule, SyncState
+
     orchestrator = SyncOrchestrator(db)
     incremental = IncrementalSync(db)
 
@@ -56,16 +59,18 @@ async def sync_schedules(db: Session = Depends(get_db)) -> dict:
             "error": "Could not connect to PBS API",
             "detail": str(e),
             "latest_api_schedule": None,
-            "current_db_schedule": None,
+            "last_fully_synced_schedule": None,
             "schedules": [],
             "needs_sync": True,
         }
 
-    current_db = await incremental.get_current_db_schedule()
+    result = db.execute(
+        select(func.min(SyncState.last_synced_schedule_code))
+    )
+    last_fully_synced = result.scalar()
 
-    from sqlalchemy import select
-    from db.models import Schedule
-    from sqlalchemy import desc
+    result = db.execute(select(func.count(SyncState.endpoint)))
+    sync_state_count = result.scalar()
 
     result = db.execute(select(Schedule).order_by(desc(Schedule.effective_date)))
     schedules = []
@@ -76,11 +81,33 @@ async def sync_schedules(db: Session = Depends(get_db)) -> dict:
             "revision_number": row.revision_number,
         })
 
+    needs_sync = False
+    changed_endpoints = []
+
+    if not latest_api:
+        needs_sync = False
+    elif sync_state_count == 0:
+        needs_sync = True
+    elif last_fully_synced is None:
+        needs_sync = True
+    elif latest_api != last_fully_synced:
+        try:
+            changes = await incremental.get_changes(
+                source_schedule_code=last_fully_synced,
+                target_schedule_code=latest_api,
+            )
+            if changes:
+                needs_sync = True
+                changed_endpoints = list(set(c.get("changed_endpoint") for c in changes if c.get("changed_endpoint")))
+        except Exception as e:
+            needs_sync = True
+
     return {
         "latest_api_schedule": latest_api,
-        "current_db_schedule": current_db,
+        "last_fully_synced_schedule": last_fully_synced,
         "schedules": schedules,
-        "needs_sync": latest_api != current_db if latest_api and current_db else True,
+        "needs_sync": needs_sync,
+        "changed_endpoints": changed_endpoints,
     }
 
 

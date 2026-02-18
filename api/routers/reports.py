@@ -62,29 +62,29 @@ def items_by_atc_level(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/price-changes")
 def price_changes(db: Session = Depends(get_db)) -> dict:
-    """Get items with recent price changes based on pricing events."""
-    from db.models import ItemPricingEvent
-    
-    # Get the most recent pricing events
+    """Get items with recent price changes based on schedule changes."""
+    # For now, return items sorted by most recently updated
+    # This is a placeholder until we have better price change tracking
     result = db.execute(
         select(
-            ItemPricingEvent.li_item_id,
-            ItemPricingEvent.event_date,
-            ItemPricingEvent.determined_price,
-            ItemPricingEvent.previous_price
+            Item.li_item_id,
+            Item.drug_name,
+            Item.brand_name,
+            Item.determined_price,
+            Item.updated_at
         )
-        .where(ItemPricingEvent.previous_price.isnot(None))
-        .order_by(ItemPricingEvent.event_date.desc())
+        .where(Item.updated_at.isnot(None))
+        .order_by(Item.updated_at.desc())
         .limit(100)
     ).all()
     
     data = [
         {
             "li_item_id": row.li_item_id,
-            "event_date": row.event_date.isoformat() if row.event_date else None,
+            "drug_name": row.drug_name,
+            "brand_name": row.brand_name,
             "current_price": float(row.determined_price) if row.determined_price else None,
-            "previous_price": float(row.previous_price) if row.previous_price else None,
-            "price_change": float(row.determined_price - row.previous_price) if row.determined_price and row.previous_price else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
         for row in result
     ]
@@ -99,26 +99,28 @@ def restriction_changes(db: Session = Depends(get_db)) -> dict:
     # Get recent restriction-related changes
     result = db.execute(
         select(
-            SummaryOfChange.pbs_code,
+            SummaryOfChange.changed_table,
+            SummaryOfChange.table_keys,
             SummaryOfChange.change_type,
             SummaryOfChange.changed_endpoint,
             SummaryOfChange.source_schedule_code,
-            SummaryOfChange.target_schedule_code
+            SummaryOfChange.schedule_code
         )
         .where(
             SummaryOfChange.changed_endpoint.like('%restriction%')
         )
-        .order_by(SummaryOfChange.target_schedule_code.desc())
+        .order_by(SummaryOfChange.schedule_code.desc())
         .limit(100)
     ).all()
     
     data = [
         {
-            "pbs_code": row.pbs_code,
+            "changed_table": row.changed_table,
+            "table_keys": row.table_keys,
             "change_type": row.change_type,
             "changed_endpoint": row.changed_endpoint,
             "from_schedule": row.source_schedule_code,
-            "to_schedule": row.target_schedule_code,
+            "to_schedule": row.schedule_code,
         }
         for row in result
     ]

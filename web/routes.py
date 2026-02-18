@@ -38,7 +38,7 @@ def browse(request: Request):
 
 @router.get("/browse/atc")
 def browse_atc(request: Request, db: Session = Depends(get_db)):
-    atc_codes = db.execute(select(ATCCode.order_by(ATCCode.atc_code))).scalars().all()
+    atc_codes = db.execute(select(ATCCode).order_by(ATCCode.atc_code)).scalars().all()
     return templates.TemplateResponse(
         "partials/browse_list.html",
         {"request": request, "title": "ATC Codes", "items": atc_codes, "type": "atc"},

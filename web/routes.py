@@ -38,7 +38,7 @@ def browse(request: Request):
 
 @router.get("/browse/atc")
 def browse_atc(request: Request, db: Session = Depends(get_db)):
-    atc_codes = db.execute(select(ATCCode.order_by(ATCCode.atc_code))).scalars().all()
+    atc_codes = db.execute(select(ATCCode).order_by(ATCCode.atc_code)).scalars().all()
     return templates.TemplateResponse(
         "partials/browse_list.html",
         {"request": request, "title": "ATC Codes", "items": atc_codes, "type": "atc"},
@@ -64,6 +64,20 @@ def browse_manufacturers(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         "partials/browse_list.html",
         {"request": request, "title": "Manufacturers", "items": orgs, "type": "manufacturer"},
+    )
+
+
+@router.get("/browse/therapeutic-groups")
+def browse_therapeutic_groups(request: Request, db: Session = Depends(get_db)):
+    groups = db.execute(
+        select(Item.therapeutic_group_id, Item.therapeutic_group_title, func.count(Item.li_item_id).label("count"))
+        .where(Item.therapeutic_group_id.isnot(None))
+        .group_by(Item.therapeutic_group_id, Item.therapeutic_group_title)
+        .order_by(Item.therapeutic_group_title)
+    ).all()
+    return templates.TemplateResponse(
+        "partials/browse_list.html",
+        {"request": request, "title": "Therapeutic Groups", "items": groups, "type": "therapeutic_group"},
     )
 
 

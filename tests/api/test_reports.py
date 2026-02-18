@@ -14,6 +14,13 @@ def test_items_by_program_endpoint() -> None:
     data = response.json()
     assert "data" in data
     assert isinstance(data["data"], list)
+    # Validate data structure if data is returned
+    if data["data"]:
+        item = data["data"][0]
+        assert "program_code" in item
+        assert "count" in item
+        assert isinstance(item["count"], int)
+        assert item["count"] >= 0
 
 
 def test_items_by_benefit_type_endpoint() -> None:
@@ -25,6 +32,12 @@ def test_items_by_benefit_type_endpoint() -> None:
     data = response.json()
     assert "data" in data
     assert isinstance(data["data"], list)
+    if data["data"]:
+        item = data["data"][0]
+        assert "benefit_type_code" in item
+        assert "count" in item
+        assert isinstance(item["count"], int)
+        assert item["count"] >= 0
 
 
 def test_items_by_atc_level_endpoint() -> None:
@@ -36,6 +49,12 @@ def test_items_by_atc_level_endpoint() -> None:
     data = response.json()
     assert "data" in data
     assert isinstance(data["data"], list)
+    if data["data"]:
+        item = data["data"][0]
+        assert "atc_level" in item
+        assert "count" in item
+        assert isinstance(item["count"], int)
+        assert item["count"] >= 0
 
 
 def test_price_changes_endpoint() -> None:
@@ -47,6 +66,11 @@ def test_price_changes_endpoint() -> None:
     data = response.json()
     assert "data" in data
     assert isinstance(data["data"], list)
+    if data["data"]:
+        item = data["data"][0]
+        assert "li_item_id" in item
+        assert "drug_name" in item
+        assert "current_price" in item
 
 
 def test_restriction_changes_endpoint() -> None:
@@ -58,3 +82,8 @@ def test_restriction_changes_endpoint() -> None:
     data = response.json()
     assert "data" in data
     assert isinstance(data["data"], list)
+    if data["data"]:
+        item = data["data"][0]
+        assert "changed_table" in item
+        assert "change_type" in item
+        assert "changed_endpoint" in item

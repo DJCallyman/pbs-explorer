@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
-from db.models import Item, ATCCode
+from db.models import Item, ATCCode, SummaryOfChange
 
 router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
@@ -94,8 +94,6 @@ def price_changes(db: Session = Depends(get_db)) -> dict:
 @router.get("/restriction-changes")
 def restriction_changes(db: Session = Depends(get_db)) -> dict:
     """Get restriction changes from summary of changes."""
-    from db.models import SummaryOfChange
-    
     # Get recent restriction-related changes
     result = db.execute(
         select(

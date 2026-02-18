@@ -67,6 +67,20 @@ def browse_manufacturers(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/browse/therapeutic-groups")
+def browse_therapeutic_groups(request: Request, db: Session = Depends(get_db)):
+    groups = db.execute(
+        select(func.count(Item.li_item_id).label("count"), Item.therapeutic_group_id, Item.therapeutic_group_title)
+        .where(Item.therapeutic_group_id.isnot(None))
+        .group_by(Item.therapeutic_group_id, Item.therapeutic_group_title)
+        .order_by(Item.therapeutic_group_title)
+    ).all()
+    return templates.TemplateResponse(
+        "partials/browse_list.html",
+        {"request": request, "title": "Therapeutic Groups", "items": groups, "type": "therapeutic_group"},
+    )
+
+
 @router.get("/item/{li_item_id}")
 def item_detail(request: Request, li_item_id: str):
     return templates.TemplateResponse(

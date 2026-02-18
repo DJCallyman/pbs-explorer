@@ -7,6 +7,8 @@
         {{ item.program_code }}: {{ item.count }} items
       {% elif type == "manufacturer" %}
         {{ item.name }}: {{ item.count }} items
+      {% elif type == "therapeutic_group" %}
+        {{ item.therapeutic_group_title }}: {{ item.count }} items
       {% endif %}
     </li>
   {% endfor %}

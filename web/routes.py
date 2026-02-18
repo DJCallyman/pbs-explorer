@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_db
 from db.models import ATCCode, Item, Indication, Organisation, PrescribingText, Schedule
 from services.sync.status_store import status_store
+from services.sync.orchestrator import SyncOrchestrator
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -230,9 +231,15 @@ def web_items(
 def web_stats(request: Request, db: Session = Depends(get_db)):
     total_items = db.execute(select(func.count(Item.li_item_id))).scalar()
     latest_schedule = db.execute(select(Schedule.schedule_code).order_by(Schedule.effective_date.desc()).limit(1)).scalar()
+    orchestrator = SyncOrchestrator(db)
+    sync_status = orchestrator.get_sync_status()
+    last_sync = sync_status.get("last_sync")
+    last_sync_display = "Never"
+    if last_sync and last_sync.get("at"):
+        last_sync_display = last_sync["at"][:10] if "T" in last_sync["at"] else last_sync["at"]
     return templates.TemplateResponse(
         "partials/home_stats.html",
-        {"request": request, "total_items": total_items or 0, "latest_schedule": latest_schedule or "N/A", "last_sync": "N/A"},
+        {"request": request, "total_items": total_items or 0, "latest_schedule": latest_schedule or "N/A", "last_sync": last_sync_display},
     )
 
 

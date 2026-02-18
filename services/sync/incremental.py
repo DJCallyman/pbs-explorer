@@ -36,7 +36,11 @@ class IncrementalSync:
         endpoint_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch changes from summary-of-changes endpoint."""
-        filter_expr = f"source_schedule_code eq {source_schedule_code} and target_schedule_code eq {target_schedule_code}"
+        target_effective_date = await self._get_schedule_effective_date(target_schedule_code)
+        if not target_effective_date:
+            raise Exception(f"Could not get effective date for schedule {target_schedule_code}")
+        
+        filter_expr = f"source_schedule_code eq {source_schedule_code} and target_effective_date eq '{target_effective_date}'"
         if endpoint_filter:
             filter_expr += f" and changed_endpoint eq '{endpoint_filter}'"
 
@@ -51,6 +55,21 @@ class IncrementalSync:
 
         rows, _ = parse_json(response.text)
         return rows
+
+    async def _get_schedule_effective_date(self, schedule_code: str) -> Optional[str]:
+        """Get the effective date for a schedule code from the API."""
+        response = await self.client.get(
+            "/schedules",
+            params={
+                "filter": f"schedule_code eq {schedule_code}",
+                "limit": 1,
+                "fields": "effective_date",
+            },
+        )
+        rows, _ = parse_json(response.text)
+        if rows:
+            return rows[0].get("effective_date")
+        return None
 
     async def apply_change(
         self,

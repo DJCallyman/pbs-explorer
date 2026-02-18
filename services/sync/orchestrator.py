@@ -313,28 +313,61 @@ class SyncOrchestrator:
 
         self.start_time = time.time()
 
+        from sqlalchemy import select, func
+        result = self.session.execute(select(func.count(SyncState.endpoint)))
+        sync_state_count = result.scalar()
+
+        result = self.session.execute(select(func.min(SyncState.last_synced_schedule_code)))
+        last_synced_schedule = result.scalar()
+
         latest_api_schedule = await self.incremental_sync.get_latest_schedule_code()
-        current_db_schedule = await self.incremental_sync.get_current_db_schedule()
 
         if not latest_api_schedule:
             raise Exception("Could not get latest schedule from API")
 
-        if not current_db_schedule:
-            self.logger.warning("No schedule found in database. Performing full sync instead.")
+        if sync_state_count == 0 or last_synced_schedule is None:
+            self.logger.warning("No sync state found in database. Performing full sync instead.")
             return await self.sync_all_full()
 
-        if latest_api_schedule == current_db_schedule:
-            self.logger.info(f"Database is already at latest schedule ({latest_api_schedule}). No sync needed.")
+        if latest_api_schedule == last_synced_schedule:
+            self.logger.info(f"All endpoints already synced to latest schedule ({latest_api_schedule}). No sync needed.")
             return {}
 
-        previous_schedule = await self.incremental_sync.get_previous_db_schedule(latest_api_schedule)
+        previous_schedule = last_synced_schedule
 
         self.logger.info("=" * 80)
         self.logger.info("Starting INCREMENTAL PBS API Sync")
-        self.logger.info(f"Previous DB schedule: {previous_schedule or 'none'}")
-        self.logger.info(f"Current DB schedule: {current_db_schedule}")
+        self.logger.info(f"Last synced schedule: {last_synced_schedule}")
         self.logger.info(f"Latest API schedule: {latest_api_schedule}")
         self.logger.info("=" * 80)
+
+        from sqlalchemy import desc
+        from db.models import Schedule
+        result = self.session.execute(
+            select(Schedule.schedule_code)
+            .where(Schedule.schedule_code != latest_api_schedule)
+            .order_by(desc(Schedule.effective_date))
+            .limit(1)
+        )
+        db_previous_schedule = result.scalar()
+
+        if db_previous_schedule:
+            self.logger.info(f"Previous schedule in DB: {db_previous_schedule}")
+        else:
+            self.logger.warning("No previous schedule found in DB")
+
+        self.logger.info("Fetching summary-of-changes to determine which endpoints need updating...")
+        source_for_changes = db_previous_schedule or last_synced_schedule
+        try:
+            all_changes = await self.incremental_sync.get_changes(
+                source_schedule_code=source_for_changes,
+                target_schedule_code=latest_api_schedule,
+            )
+            changed_endpoints = set(c.get("changed_endpoint") for c in all_changes if c.get("changed_endpoint"))
+            self.logger.info(f"Found changes in {len(changed_endpoints)} endpoints: {changed_endpoints}")
+        except Exception as e:
+            self.logger.warning(f"Could not fetch summary-of-changes: {e}. Falling back to full sync for all non-static endpoints.")
+            changed_endpoints = None
 
         results: Dict[str, int] = {}
         total_endpoints = len(SYNC_PLAN)
@@ -357,36 +390,29 @@ class SyncOrchestrator:
                         key_fields=meta.get("key_fields", []),
                         extra_fields=meta.get("extra_fields"),
                     )
+                elif changed_endpoints and endpoint not in changed_endpoints:
+                    self.logger.info(f"  No changes for {endpoint}, skipping")
+                    fetched = 0
+                    synced = 0
+                    used_schedule = latest_api_schedule
                 else:
                     synced = await self.incremental_sync.sync_endpoint_incremental(
                         endpoint=endpoint,
                         model=meta["model"],
                         key_fields=meta.get("key_fields", []),
-                        source_schedule=current_db_schedule,
+                        source_schedule=source_for_changes,
                         target_schedule=latest_api_schedule,
                     )
-                    fetched = synced  # Incremental applies changes directly
+                    fetched = synced
                     used_schedule = latest_api_schedule
 
                 results[endpoint] = {"fetched": fetched, "synced": synced}
                 self._update_sync_state(endpoint, fetched, synced, used_schedule, "incremental")
 
             except Exception as exc:
-                self.logger.warning(f"Incremental sync failed for {endpoint}: {exc}")
-                self.logger.info(f"Falling back to full sync for {endpoint}...")
-                try:
-                    fetched, synced, used_schedule = await self.sync_endpoint(
-                        endpoint=endpoint,
-                        model=meta["model"],
-                        key_fields=meta.get("key_fields", []),
-                        extra_fields=meta.get("extra_fields"),
-                    )
-                    results[endpoint] = {"fetched": fetched, "synced": synced}
-                    self._update_sync_state(endpoint, fetched, synced, used_schedule, "incremental_fallback")
-                except Exception as e:
-                    self.status.last_error = str(e)
-                    self.logger.exception(f"Sync failed: {endpoint}")
-                    raise
+                self.logger.warning(f"Incremental sync failed for {endpoint}: {exc}. Skipping this endpoint.")
+                results[endpoint] = {"fetched": 0, "synced": 0, "error": str(exc)}
+                self._update_sync_state(endpoint, 0, 0, None, "incremental_failed")
 
         total_time = time.time() - self.start_time
         total_synced = sum(r.get("synced", 0) for r in results.values())
@@ -454,6 +480,9 @@ class SyncOrchestrator:
         result = self.session.execute(select(func.max(Schedule.schedule_code)))
         latest_schedule = result.scalar()
 
+        result = self.session.execute(select(func.min(SyncState.last_synced_schedule_code)))
+        last_synced_schedule = result.scalar()
+
         result = self.session.execute(select(func.count(SyncState.endpoint)))
         sync_state_count = result.scalar()
 
@@ -473,6 +502,7 @@ class SyncOrchestrator:
             "last_error": global_status.last_error if global_status else None,
             "records_processed": global_status.records_processed if global_status else 0,
             "latest_db_schedule": latest_schedule,
+            "last_synced_schedule": last_synced_schedule,
             "sync_state_count": sync_state_count,
             "last_sync": {
                 "type": last_sync.sync_type if last_sync else None,

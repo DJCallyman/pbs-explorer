@@ -48,7 +48,7 @@ STATIC_ENDPOINTS = {
 
 SYNC_PLAN = {
     "schedules": {"model": Schedule, "key_fields": ["schedule_code"], "is_static": True},
-    "summary-of-changes": {"model": SummaryOfChange, "key_fields": ["schedule_code", "source_schedule_code", "changed_table", "table_keys"]},
+    "summary-of-changes": {"model": SummaryOfChange, "key_fields": ["schedule_code", "source_schedule_code", "changed_table", "table_keys"], "is_static": True},
     "programs": {"model": Program, "key_fields": ["program_code", "schedule_code"], "is_static": True},
     "organisations": {"model": Organisation, "key_fields": ["organisation_id", "schedule_code"], "is_static": True},
     "containers": {"model": Container, "key_fields": ["container_code", "schedule_code"], "is_static": True},

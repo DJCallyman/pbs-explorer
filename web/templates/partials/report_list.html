@@ -1,0 +1,23 @@
+<h3>{{ title }}</h3>
+{% if data %}
+<table class="results-table">
+  <thead>
+    <tr>
+      {% for col in columns %}
+        <th>{{ col.label }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in data %}
+      <tr>
+        {% for col in columns %}
+          <td>{{ row[col.key] }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="results-empty">No data available. Run a sync first to populate the database.</p>
+{% endif %}

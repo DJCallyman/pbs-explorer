@@ -4,11 +4,12 @@
 <section>
   <h2>Reports</h2>
   <ul>
-    <li>Items by Program</li>
-    <li>Items by Benefit Type</li>
-    <li>Items by ATC Level</li>
-    <li>Price Changes</li>
-    <li>Restriction Changes</li>
+    <li><a href="#" hx-get="/reports/items-by-program" hx-target="#report-results" hx-swap="innerHTML">Items by Program</a></li>
+    <li><a href="#" hx-get="/reports/items-by-benefit-type" hx-target="#report-results" hx-swap="innerHTML">Items by Benefit Type</a></li>
+    <li><a href="#" hx-get="/reports/items-by-atc-level" hx-target="#report-results" hx-swap="innerHTML">Items by ATC Level</a></li>
+    <li><a href="#" hx-get="/reports/price-changes" hx-target="#report-results" hx-swap="innerHTML">Price Changes</a></li>
+    <li><a href="#" hx-get="/reports/restriction-changes" hx-target="#report-results" hx-swap="innerHTML">Restriction Changes</a></li>
   </ul>
+  <div id="report-results"></div>
 </section>
 {% endblock %}

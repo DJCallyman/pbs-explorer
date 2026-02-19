@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import re as _re
 from pathlib import Path
 from urllib.parse import urlencode, quote
 
+import httpx
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
-from db.models import ATCCode, Item, Indication, Organisation, PrescribingText, Schedule
+from db.models import ATCCode, Item, Indication, Organisation, PrescribingText, Schedule, SummaryOfChange
 from services.sync.status_store import status_store
 from services.sync.orchestrator import SyncOrchestrator
 
@@ -38,7 +40,7 @@ def browse(request: Request):
 
 @router.get("/browse/atc")
 def browse_atc(request: Request, db: Session = Depends(get_db)):
-    atc_codes = db.execute(select(ATCCode.order_by(ATCCode.atc_code))).scalars().all()
+    atc_codes = db.execute(select(ATCCode).order_by(ATCCode.atc_code)).scalars().all()
     return templates.TemplateResponse(
         "partials/browse_list.html",
         {"request": request, "title": "ATC Codes", "items": atc_codes, "type": "atc"},
@@ -82,14 +84,122 @@ def reports(request: Request):
 
 @router.get("/reports/items-by-program")
 def reports_items_by_program(request: Request, db: Session = Depends(get_db)):
-    data = db.execute(
-        select(func.count(Item.li_item_id).label("count"), Item.program_code)
+    rows = db.execute(
+        select(Item.program_code, func.count(Item.li_item_id).label("count"))
         .group_by(Item.program_code)
         .order_by(func.count(Item.li_item_id).desc())
     ).all()
+    data = [{"program_code": r.program_code or "(none)", "count": r.count} for r in rows]
+    columns = [{"key": "program_code", "label": "Program"}, {"key": "count", "label": "Item Count"}]
     return templates.TemplateResponse(
         "partials/report_list.html",
-        {"request": request, "title": "Items by Program", "data": data},
+        {"request": request, "title": "Items by Program", "data": data, "columns": columns},
+    )
+
+
+@router.get("/reports/items-by-benefit-type")
+def reports_items_by_benefit_type(request: Request, db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(Item.benefit_type_code, func.count(Item.li_item_id).label("count"))
+        .where(Item.benefit_type_code.isnot(None))
+        .group_by(Item.benefit_type_code)
+        .order_by(func.count(Item.li_item_id).desc())
+    ).all()
+    data = [{"benefit_type_code": r.benefit_type_code, "count": r.count} for r in rows]
+    columns = [{"key": "benefit_type_code", "label": "Benefit Type"}, {"key": "count", "label": "Item Count"}]
+    return templates.TemplateResponse(
+        "partials/report_list.html",
+        {"request": request, "title": "Items by Benefit Type", "data": data, "columns": columns},
+    )
+
+
+@router.get("/reports/items-by-atc-level")
+def reports_items_by_atc_level(request: Request, db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(ATCCode.atc_level, func.count(ATCCode.atc_code).label("count"))
+        .where(ATCCode.atc_level.isnot(None))
+        .group_by(ATCCode.atc_level)
+        .order_by(ATCCode.atc_level)
+    ).all()
+    data = [{"atc_level": r.atc_level, "count": r.count} for r in rows]
+    columns = [{"key": "atc_level", "label": "ATC Level"}, {"key": "count", "label": "Code Count"}]
+    return templates.TemplateResponse(
+        "partials/report_list.html",
+        {"request": request, "title": "Items by ATC Level", "data": data, "columns": columns},
+    )
+
+
+@router.get("/reports/price-changes")
+def reports_price_changes(request: Request, db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(
+            Item.pbs_code,
+            Item.drug_name,
+            Item.brand_name,
+            Item.determined_price,
+            Item.updated_at,
+        )
+        .where(Item.updated_at.isnot(None))
+        .order_by(Item.updated_at.desc())
+        .limit(100)
+    ).all()
+    data = [
+        {
+            "pbs_code": r.pbs_code,
+            "drug_name": r.drug_name,
+            "brand_name": r.brand_name,
+            "price": str(r.determined_price) if r.determined_price else "",
+            "updated": r.updated_at.strftime("%Y-%m-%d %H:%M") if r.updated_at else "",
+        }
+        for r in rows
+    ]
+    columns = [
+        {"key": "pbs_code", "label": "PBS Code"},
+        {"key": "drug_name", "label": "Drug"},
+        {"key": "brand_name", "label": "Brand"},
+        {"key": "price", "label": "Price"},
+        {"key": "updated", "label": "Last Updated"},
+    ]
+    return templates.TemplateResponse(
+        "partials/report_list.html",
+        {"request": request, "title": "Price Changes", "data": data, "columns": columns},
+    )
+
+
+@router.get("/reports/restriction-changes")
+def reports_restriction_changes(request: Request, db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(
+            SummaryOfChange.changed_table,
+            SummaryOfChange.change_type,
+            SummaryOfChange.changed_endpoint,
+            SummaryOfChange.source_schedule_code,
+            SummaryOfChange.schedule_code,
+        )
+        .where(SummaryOfChange.changed_endpoint.like("%restriction%"))
+        .order_by(SummaryOfChange.schedule_code.desc())
+        .limit(100)
+    ).all()
+    data = [
+        {
+            "table": r.changed_table,
+            "change_type": r.change_type,
+            "endpoint": r.changed_endpoint,
+            "from_schedule": r.source_schedule_code,
+            "to_schedule": r.schedule_code,
+        }
+        for r in rows
+    ]
+    columns = [
+        {"key": "table", "label": "Table"},
+        {"key": "change_type", "label": "Change Type"},
+        {"key": "endpoint", "label": "Endpoint"},
+        {"key": "from_schedule", "label": "From Schedule"},
+        {"key": "to_schedule", "label": "To Schedule"},
+    ]
+    return templates.TemplateResponse(
+        "partials/report_list.html",
+        {"request": request, "title": "Restriction Changes", "data": data, "columns": columns},
     )
 
 
@@ -254,7 +364,7 @@ def pbs_report(
     """Generate a Medicare Statistics report URL and redirect to it."""
     # Parse PBS codes (comma-separated, optionally quoted)
     import re
-    codes = re.findall(r"'([^']+)'", pbs_codes)
+    codes = re.findall(r"'([^',]+)'", pbs_codes)
     if not codes:
         codes = pbs_codes.split(',')
     codes = [c.strip() for c in codes if c.strip()]
@@ -289,3 +399,219 @@ def pbs_report(
     redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
     
     return RedirectResponse(url=redirect_url, status_code=302)
+
+
+@router.post("/web/pbs-report-warmup")
+async def pbs_report_warmup(
+    request: Request,
+    pbs_codes: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Fire-and-forget: hit the SAS server to trigger report generation
+    so the result is cached by the time the user clicks Download Excel.
+    Returns 202 immediately; the actual request runs in the background.
+    """
+    import re
+    import asyncio
+    import logging
+    logger = logging.getLogger(__name__)
+
+    codes = re.findall(r"'([^',]+)'", pbs_codes)
+    if not codes:
+        codes = pbs_codes.split(",")
+    codes = [c.strip() for c in codes if c.strip()]
+    if not codes:
+        return Response(status_code=202)
+
+    if not start_date:
+        earliest = db.execute(
+            select(func.min(Item.first_listed_date))
+            .where(Item.pbs_code.in_(codes))
+        ).scalar_one_or_none()
+        start_date = earliest.strftime("%Y%m") if earliest else "202501"
+    if not end_date:
+        end_date = "202511"
+
+    base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
+    program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
+    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    report_url = (
+        base_url
+        + "?_PROGRAM=" + quote(program, safe="")
+        + "&itemlst=" + itemlst
+        + "&ITEMCNT=" + str(len(codes))
+        + "&VAR=SERVICES&RPT_FMT=2"
+        + "&start_dt=" + start_date
+        + "&end_dt=" + end_date
+    )
+
+    async def _warmup():
+        """Background task: hit SAS to warm the cache, ignore result."""
+        async def _strip_referer(req: httpx.Request) -> None:
+            if "referer" in req.headers:
+                del req.headers["referer"]
+        try:
+            async with httpx.AsyncClient(
+                follow_redirects=True,
+                timeout=httpx.Timeout(connect=15.0, read=60.0, write=15.0, pool=15.0),
+                event_hooks={"request": [_strip_referer]},
+            ) as client:
+                logger.info("[warmup] Hitting SAS to pre-generate report…")
+                resp = await client.get(report_url)
+                logger.info("[warmup] Done: status=%s  size=%d bytes", resp.status_code, len(resp.content))
+        except Exception as exc:
+            logger.debug("[warmup] Failed (non-critical): %s", exc)
+
+    asyncio.create_task(_warmup())
+    return Response(status_code=202)
+
+
+@router.get("/web/pbs-report-excel")
+async def pbs_report_excel(
+    request: Request,
+    pbs_codes: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Fetch the Medicare Statistics report server-side, extract the
+    session-specific report_name, then proxy the Excel (CSV) download
+    back to the user.  The SAS server requires a two-step flow:
+      1. Render the HTML report (creates a temp file on the server).
+      2. Hit the mbs_csv stored process with the temp file name.
+
+    The SAS server can be slow on the first request (report generation)
+    but caches results for subsequent requests.  We retry automatically
+    to handle transient failures/timeouts.
+    """
+    import re
+    import asyncio
+    import logging
+    import time
+    logger = logging.getLogger(__name__)
+
+    codes = re.findall(r"'([^',]+)'", pbs_codes)
+    if not codes:
+        codes = pbs_codes.split(",")
+    codes = [c.strip() for c in codes if c.strip()]
+    if not codes:
+        raise HTTPException(status_code=400, detail="No PBS codes provided")
+
+    if not start_date:
+        earliest = db.execute(
+            select(func.min(Item.first_listed_date))
+            .where(Item.pbs_code.in_(codes))
+        ).scalar_one_or_none()
+        start_date = earliest.strftime("%Y%m") if earliest else "202501"
+    if not end_date:
+        end_date = "202511"
+
+    base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
+    program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
+    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    report_url = (
+        base_url
+        + "?_PROGRAM=" + quote(program, safe="")
+        + "&itemlst=" + itemlst
+        + "&ITEMCNT=" + str(len(codes))
+        + "&VAR=SERVICES&RPT_FMT=2"
+        + "&start_dt=" + start_date
+        + "&end_dt=" + end_date
+    )
+
+    async def _strip_referer(request: httpx.Request) -> None:
+        if "referer" in request.headers:
+            del request.headers["referer"]
+
+    MAX_ATTEMPTS = 3
+    last_error: Exception | None = None
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        t0 = time.monotonic()
+        try:
+            async with httpx.AsyncClient(
+                follow_redirects=True,
+                timeout=httpx.Timeout(connect=15.0, read=20.0, write=15.0, pool=15.0),
+                event_hooks={"request": [_strip_referer]},
+            ) as client:
+                # Step 1 – render the HTML report so the server creates the temp file
+                logger.info("[attempt %d/%d] Fetching SAS HTML report…", attempt, MAX_ATTEMPTS)
+                html_resp = await client.get(report_url)
+                t1 = time.monotonic()
+                logger.info(
+                    "[attempt %d/%d] HTML response: status=%s  size=%d bytes  elapsed=%.1fs",
+                    attempt, MAX_ATTEMPTS, html_resp.status_code, len(html_resp.text), t1 - t0,
+                )
+                html_resp.raise_for_status()
+
+                # Extract report_name and title1 from the download form
+                m = re.search(r'name=["\']report_name["\']\s+value=["\']([^"\']+)["\']', html_resp.text)
+                t = re.search(r'name=["\']title1["\']\s+value=["\']([^"\']+)["\']', html_resp.text)
+                if not m:
+                    logger.warning(
+                        "[attempt %d/%d] report_name not found. Response snippet: %s",
+                        attempt, MAX_ATTEMPTS, html_resp.text[:500],
+                    )
+                    if attempt < MAX_ATTEMPTS:
+                        logger.info("Retrying in 1 s …")
+                        await asyncio.sleep(1)
+                        continue
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Could not find report_name in upstream response",
+                    )
+                report_name = m.group(1)
+                title1 = t.group(1) if t else report_name
+                logger.info("[attempt %d/%d] report_name=%s", attempt, MAX_ATTEMPTS, report_name)
+
+                # Step 2 – request the CSV/Excel download
+                csv_program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/mbs_csv"
+                csv_url = (
+                    base_url
+                    + "?_PROGRAM=" + quote(csv_program, safe="")
+                    + "&report_name=" + quote(report_name, safe="")
+                    + "&title1=" + quote(title1, safe="")
+                    + "&mca_pgm=PBS"
+                )
+                logger.info("[attempt %d/%d] Fetching Excel file…", attempt, MAX_ATTEMPTS)
+                csv_resp = await client.get(csv_url)
+                t2 = time.monotonic()
+                logger.info(
+                    "[attempt %d/%d] Excel response: status=%s  size=%d bytes  elapsed=%.1fs  total=%.1fs",
+                    attempt, MAX_ATTEMPTS, csv_resp.status_code, len(csv_resp.content), t2 - t1, t2 - t0,
+                )
+                csv_resp.raise_for_status()
+
+                # Determine filename
+                filename = "pbs_report.xls"
+                cd = csv_resp.headers.get("content-disposition", "")
+                fn_match = re.search(r'filename=["\']?([^"\'\s;]+)', cd)
+                if fn_match:
+                    filename = fn_match.group(1)
+
+                return Response(
+                    content=csv_resp.content,
+                    media_type=csv_resp.headers.get("content-type", "text/csv"),
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
+
+        except httpx.HTTPError as exc:
+            elapsed = time.monotonic() - t0
+            logger.warning(
+                "[attempt %d/%d] SAS request failed after %.1fs: %s",
+                attempt, MAX_ATTEMPTS, elapsed, exc,
+            )
+            last_error = exc
+            if attempt < MAX_ATTEMPTS:
+                logger.info("Retrying in 1 s …")
+                await asyncio.sleep(1)
+                continue
+
+    # All attempts exhausted
+    logger.error("All %d attempts to fetch SAS report failed", MAX_ATTEMPTS)
+    raise HTTPException(
+        status_code=502,
+        detail=f"Failed to fetch report from Medicare Statistics after {MAX_ATTEMPTS} attempts: {last_error}",
+    )

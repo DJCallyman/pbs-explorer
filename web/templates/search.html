@@ -33,6 +33,9 @@
     <button type="button" class="btn btn-secondary" onclick="copyReportURL()" style="margin-left: 0.5rem;">
       Copy Report URL
     </button>
+    <button type="button" class="btn btn-primary" onclick="downloadExcel()" style="margin-left: 0.5rem;">
+      Download Excel
+    </button>
   </div>
 </section>
 
@@ -123,21 +126,110 @@ function getDirectReportURL() {
 }
 
 function viewPBSReport() {
-  const url = getPBSReportURL();
-  if (url) {
-    window.open(url, '_blank');
+  const url = getDirectReportURL();
+  if (!url) {
+    alert('No results to generate report for');
+    return;
   }
+  // Open via a temporary <a rel="noreferrer"> to strip the Referer header.
+  // The SAS server blocks requests with a Referer (CSRF protection),
+  // so this makes it behave like pasting the URL into a new tab.
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noreferrer noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function copyReportURL() {
   const url = getDirectReportURL();
-  if (url) {
-    navigator.clipboard.writeText(url).then(() => {
-      alert('URL copied! Paste it directly into a new browser tab.');
-    }).catch(() => {
-      prompt('Copy this URL:', url);
-    });
+  if (!url) {
+    alert('No results to generate report for');
+    return;
   }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('URL copied! Paste it directly into a new browser tab.');
+      }).catch(() => {
+        prompt('Copy this URL:', url);
+      });
+    } else {
+      prompt('Copy this URL:', url);
+    }
+  } catch (err) {
+    prompt('Copy this URL:', url);
+  }
+}
+
+function downloadExcel() {
+  const pbsCodes = [];
+  let firstListedDate = null;
+  document.querySelectorAll('#results tbody tr').forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length >= 4) {
+      const pbsCode = cells[2].textContent.trim();
+      const listedDate = cells[3].textContent.trim();
+      if (pbsCode) pbsCodes.push(pbsCode);
+      if (!firstListedDate && listedDate) firstListedDate = listedDate;
+    }
+  });
+  if (pbsCodes.length === 0) {
+    alert('No results to generate report for');
+    return;
+  }
+  let startDate = '202501';
+  if (firstListedDate) {
+    const parsed = new Date(firstListedDate);
+    if (!isNaN(parsed)) startDate = parsed.toISOString().slice(0, 7).replace('-', '');
+  }
+  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const params = new URLSearchParams({
+    pbs_codes: itemlst,
+    start_date: startDate,
+    end_date: '202511'
+  });
+  // Show a loading indicator on the button
+  const btn = document.querySelector('[onclick="downloadExcel()"]');
+  const origText = btn.textContent;
+  btn.textContent = 'Downloading…';
+  btn.disabled = true;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90 * 1000);
+
+  fetch('/web/pbs-report-excel?' + params.toString(), { signal: controller.signal })
+    .then(resp => {
+      if (!resp.ok) return resp.json().then(e => { throw new Error(e.detail || 'Download failed'); });
+      const cd = resp.headers.get('content-disposition') || '';
+      const match = cd.match(/filename="?([^";\s]+)"?/);
+      const filename = match ? match[1] : 'pbs_report.xls';
+      return resp.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        alert('Download timed out. Please try again — it should be faster the second time.');
+      } else {
+        alert('Download failed: ' + err.message);
+      }
+    })
+    .finally(() => {
+      clearTimeout(timeoutId);
+      btn.textContent = origText;
+      btn.disabled = false;
+    });
 }
 
 document.body.addEventListener('htmx:afterSwap', function(e) {
@@ -145,6 +237,36 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     const reportSection = document.getElementById('report-section');
     const hasResults = document.querySelectorAll('#results tbody tr').length > 0;
     reportSection.style.display = hasResults ? 'block' : 'none';
+
+    // Fire-and-forget warmup: hit SAS server now so the report is
+    // cached by the time the user clicks "Download Excel".
+    if (hasResults) {
+      const pbsCodes = [];
+      let firstListedDate = null;
+      document.querySelectorAll('#results tbody tr').forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 4) {
+          const code = cells[2].textContent.trim();
+          const dated = cells[3].textContent.trim();
+          if (code) pbsCodes.push(code);
+          if (!firstListedDate && dated) firstListedDate = dated;
+        }
+      });
+      if (pbsCodes.length) {
+        let startDate = '202501';
+        if (firstListedDate) {
+          const p = new Date(firstListedDate);
+          if (!isNaN(p)) startDate = p.toISOString().slice(0, 7).replace('-', '');
+        }
+        const itemlst = "''" + ",'"+pbsCodes.join("','")+"',''";
+        const params = new URLSearchParams({
+          pbs_codes: itemlst,
+          start_date: startDate,
+          end_date: '202511'
+        });
+        fetch('/web/pbs-report-warmup?' + params.toString(), { method: 'POST' }).catch(() => {});
+      }
+    }
   }
 });
 </script>

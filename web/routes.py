@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from api.deps import get_db
 from db.models import ATCCode, Item, Indication, Organisation, PrescribingText, Schedule, SummaryOfChange
+from db.models.app_setting import AppSetting
 from services.sync.status_store import status_store
 from services.sync.orchestrator import SyncOrchestrator
 
@@ -21,6 +22,21 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter(include_in_schema=False)
+
+DEFAULT_MEDICARE_END_DATE = "202511"
+
+
+def _get_medicare_end_date(db: Session) -> str:
+    """Read the medicare_stats_end_date setting from the DB, with fallback."""
+    row = db.execute(
+        select(AppSetting.value).where(AppSetting.key == "medicare_stats_end_date")
+    ).scalar()
+    return row or DEFAULT_MEDICARE_END_DATE
+
+
+@router.get("/web/settings/medicare-end-date")
+def get_medicare_end_date(db: Session = Depends(get_db)):
+    return {"end_date": _get_medicare_end_date(db)}
 
 
 @router.get("/")
@@ -397,20 +413,20 @@ def pbs_report(
         else:
             start_date = "202501"
     
-    # Use provided end_date or fixed end date
+    # Use provided end_date or DB setting
     if not end_date:
-        end_date = "202511"
+        end_date = _get_medicare_end_date(db)
     
     # Build the report URL - exact format matching working URL
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
     
-    # Format: '','code1','code2','' with leading and trailing empty quotes
-    # No LIST parameter, ITEMCNT goes after itemlst
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    # Format: codes zero-padded to 6 chars, e.g. '08213G' for 5-char code, '13135H' unchanged
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     
-    # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, VAR, RPT_FMT, start_dt, end_dt
-    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
+    # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, LIST, VAR, RPT_FMT, start_dt, end_dt
+    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&LIST=" + quote(list_param, safe='') + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
     
     return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -446,16 +462,18 @@ async def pbs_report_warmup(
         ).scalar_one_or_none()
         start_date = earliest.strftime("%Y%m") if earliest else "202501"
     if not end_date:
-        end_date = "202511"
+        end_date = _get_medicare_end_date(db)
 
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     report_url = (
         base_url
         + "?_PROGRAM=" + quote(program, safe="")
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
+        + "&LIST=" + quote(list_param, safe="")
         + "&VAR=SERVICES&RPT_FMT=2"
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date
@@ -520,16 +538,18 @@ async def pbs_report_excel(
         ).scalar_one_or_none()
         start_date = earliest.strftime("%Y%m") if earliest else "202501"
     if not end_date:
-        end_date = "202511"
+        end_date = _get_medicare_end_date(db)
 
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     report_url = (
         base_url
         + "?_PROGRAM=" + quote(program, safe="")
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
+        + "&LIST=" + quote(list_param, safe="")
         + "&VAR=SERVICES&RPT_FMT=2"
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date

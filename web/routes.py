@@ -45,8 +45,12 @@ def home(request: Request):
 
 
 @router.get("/search")
-def search(request: Request):
-    return templates.TemplateResponse("search.html", {"request": request})
+def search(request: Request, db: Session = Depends(get_db)):
+    end_date = _get_medicare_end_date(db)
+    return templates.TemplateResponse("search.html", {
+        "request": request,
+        "medicare_end_date": end_date,
+    })
 
 
 @router.get("/browse")

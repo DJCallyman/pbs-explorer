@@ -21,7 +21,7 @@ class PBSAPIClient:
 
     async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=120.0)) as client:
             response = await client.get(url, params=params, headers=self._headers())
             response.raise_for_status()
             return response

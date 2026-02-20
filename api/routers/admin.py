@@ -280,3 +280,41 @@ def config_get() -> dict:
 @router.put("/config")
 def config_update() -> dict:
     return {"status": "not_implemented"}
+
+
+class UpdateSettingRequest(BaseModel):
+    value: str
+
+
+@router.get("/settings/medicare-end-date")
+def get_medicare_end_date(db: Session = Depends(get_db)) -> dict:
+    from db.models.app_setting import AppSetting
+    row = db.execute(
+        __import__("sqlalchemy").select(AppSetting.value)
+        .where(AppSetting.key == "medicare_stats_end_date")
+    ).scalar()
+    return {"end_date": row or "202511"}
+
+
+@router.put("/settings/medicare-end-date")
+def update_medicare_end_date(body: UpdateSettingRequest, db: Session = Depends(get_db)) -> dict:
+    import re
+    from datetime import datetime, timezone
+    from db.models.app_setting import AppSetting
+
+    value = body.value.strip()
+    if not re.match(r"^\d{6}$", value):
+        raise HTTPException(status_code=400, detail="Value must be in YYYYMM format, e.g. 202511")
+
+    existing = db.execute(
+        __import__("sqlalchemy").select(AppSetting)
+        .where(AppSetting.key == "medicare_stats_end_date")
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.value = value
+        existing.updated_at = datetime.now(timezone.utc)
+    else:
+        db.add(AppSetting(key="medicare_stats_end_date", value=value, updated_at=datetime.now(timezone.utc)))
+    db.commit()
+    return {"end_date": value}

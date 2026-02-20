@@ -81,6 +81,20 @@
       <p class="loading">Loading...</p>
     </div>
   </div>
+
+  <div class="admin-card">
+    <h3>Medicare Statistics End Date</h3>
+    <p style="color: #6c757d; font-size: 0.85rem; margin-bottom: 1rem;">
+      The latest YYYYMM for which PBS data is available on Medicare Statistics.
+      Update this when new months are published.
+    </p>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <input type="text" id="medicare-end-date" placeholder="YYYYMM" maxlength="6"
+             style="padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; width: 120px; font-size: 1rem;" />
+      <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem;" onclick="saveMedicareEndDate()">Save</button>
+    </div>
+    <div id="medicare-end-date-result" style="margin-top: 0.5rem;"></div>
+  </div>
 </section>
 
 <script>
@@ -149,6 +163,40 @@ function refreshAll() {
   document.getElementById('sync-status').dispatchEvent(new Event('htmx:refresh'));
   document.getElementById('sync-history').dispatchEvent(new Event('htmx:refresh'));
   document.getElementById('endpoints-list').dispatchEvent(new Event('htmx:refresh'));
+}
+
+// Medicare Statistics End Date setting
+(async function loadMedicareEndDate() {
+  try {
+    const resp = await fetch('/api/v1/admin/settings/medicare-end-date');
+    const data = await resp.json();
+    document.getElementById('medicare-end-date').value = data.end_date || '';
+  } catch (e) { /* ignore */ }
+})();
+
+async function saveMedicareEndDate() {
+  const input = document.getElementById('medicare-end-date');
+  const resultDiv = document.getElementById('medicare-end-date-result');
+  const value = input.value.trim();
+  if (!/^\d{6}$/.test(value)) {
+    resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">Please enter a valid YYYYMM value (e.g. 202511).</div>';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/v1/admin/settings/medicare-end-date', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: value }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">' + (err.detail || 'Save failed') + '</div>';
+      return;
+    }
+    resultDiv.innerHTML = '<div class="success" style="padding:0.5rem;">Saved: ' + value + '</div>';
+  } catch (e) {
+    resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">Error: ' + e.message + '</div>';
+  }
 }
 
 // Transform JSON to HTML after HTMX swap

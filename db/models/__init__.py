@@ -35,6 +35,7 @@ from db.models.summary_of_change import SummaryOfChange
 from db.models.item_pricing_event import ItemPricingEvent
 from db.models.amt_item import AMTItem
 from db.models.sync_state import SyncState
+from db.models.app_setting import AppSetting
 
 __all__ = [
     "Schedule",
@@ -72,4 +73,5 @@ __all__ = [
     "ItemPricingEvent",
     "AMTItem",
     "SyncState",
+    "AppSetting",
 ]

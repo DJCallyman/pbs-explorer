@@ -27,6 +27,10 @@
   <div id="loading" class="htmx-indicator">Searching...</div>
   <div id="results" class="results"></div>
   <div id="report-section" style="display: none; margin-top: 1rem;">
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+      <label for="medicare-end-date" style="font-weight: 500; white-space: nowrap;">Stats end date:</label>
+      <input type="month" id="medicare-end-date" value="{{ medicare_end_date[:4] }}-{{ medicare_end_date[4:] }}" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" />
+    </div>
     <button type="button" class="btn btn-primary" onclick="viewPBSReport()">
       View Medicare Statistics Report
     </button>
@@ -40,19 +44,19 @@
 </section>
 
 <script>
-/** Cached medicare stats end date, loaded from server on page init. */
-let _medicareEndDate = null;
-
-(async function() {
-  try {
-    const resp = await fetch('/web/settings/medicare-end-date');
-    const data = await resp.json();
-    _medicareEndDate = data.end_date || null;
-  } catch (e) { /* will fall back to null → uses default in functions */ }
+// Set max to current month so future months can't be selected
+(function() {
+  const now = new Date();
+  const max = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  document.getElementById('medicare-end-date').setAttribute('max', max);
 })();
 
 function getMedicareEndDate() {
-  return _medicareEndDate || '202511';
+  const picker = document.getElementById('medicare-end-date');
+  if (picker && picker.value) {
+    return picker.value.replace('-', '');
+  }
+  return '{{ medicare_end_date }}';
 }
 
 function getPBSReportURL() {
@@ -258,6 +262,22 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     const reportSection = document.getElementById('report-section');
     const hasResults = document.querySelectorAll('#results tbody tr').length > 0;
     reportSection.style.display = hasResults ? 'block' : 'none';
+
+    // Set the picker min to the earliest listing date from results
+    if (hasResults) {
+      let earliestDate = null;
+      document.querySelectorAll('#results tbody tr').forEach(row => {
+        const listedText = row.querySelectorAll('td')[3]?.textContent.trim();
+        if (listedText) {
+          const d = new Date(listedText);
+          if (!isNaN(d) && (!earliestDate || d < earliestDate)) earliestDate = d;
+        }
+      });
+      if (earliestDate) {
+        const minVal = earliestDate.getFullYear() + '-' + String(earliestDate.getMonth() + 1).padStart(2, '0');
+        document.getElementById('medicare-end-date').setAttribute('min', minVal);
+      }
+    }
 
     // Fire-and-forget warmup: hit SAS server now so the report is
     // cached by the time the user clicks "Download Excel".

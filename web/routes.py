@@ -421,12 +421,12 @@ def pbs_report(
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
     
-    # Format: '','code1','code2','' with leading and trailing empty quotes
-    # No LIST parameter, ITEMCNT goes after itemlst
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    # Format: codes zero-padded to 6 chars, e.g. '08213G' for 5-char code, '13135H' unchanged
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     
-    # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, VAR, RPT_FMT, start_dt, end_dt
-    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
+    # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, LIST, VAR, RPT_FMT, start_dt, end_dt
+    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&LIST=" + quote(list_param, safe='') + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
     
     return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -466,12 +466,14 @@ async def pbs_report_warmup(
 
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     report_url = (
         base_url
         + "?_PROGRAM=" + quote(program, safe="")
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
+        + "&LIST=" + quote(list_param, safe="")
         + "&VAR=SERVICES&RPT_FMT=2"
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date
@@ -540,12 +542,14 @@ async def pbs_report_excel(
 
     base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = "''" + ",'" + "','".join(codes) + "',''"
+    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
+    list_param = ",".join(codes)
     report_url = (
         base_url
         + "?_PROGRAM=" + quote(program, safe="")
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
+        + "&LIST=" + quote(list_param, safe="")
         + "&VAR=SERVICES&RPT_FMT=2"
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date

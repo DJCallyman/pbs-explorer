@@ -78,6 +78,8 @@ function getPBSReportURL() {
     alert('No results to generate report for');
     return null;
   }
+
+  const uniqueCodes = [...new Set(pbsCodes)];
   
   let startDate = "202501";
   if (firstListedDate) {
@@ -89,7 +91,7 @@ function getPBSReportURL() {
   
   const endDate = getMedicareEndDate();
   
-  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
   const params = new URLSearchParams({
     pbs_codes: itemlst,
     start_date: startDate,
@@ -121,6 +123,8 @@ function getDirectReportURL() {
   if (pbsCodes.length === 0) {
     return null;
   }
+
+  const uniqueCodes = [...new Set(pbsCodes)];
   
   let startDate = "202501";
   if (firstListedDate) {
@@ -133,11 +137,12 @@ function getDirectReportURL() {
   const baseURL = 'https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest';
   const program = 'SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report';
   
-  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const itemlst = uniqueCodes.map(c => "'" + c.padStart(6, '0') + "'").join(",");
+  const listParam = uniqueCodes.join(',');
   const encodedProgram = encodeURIComponent(program);
   const encodedItemlst = encodeURIComponent(itemlst);
   
-  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + pbsCodes.length + '&VAR=SERVICES&RPT_FMT=2&start_dt=' + startDate + '&end_dt=' + getMedicareEndDate();
+  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + uniqueCodes.length + '&LIST=' + encodeURIComponent(listParam) + '&VAR=SERVICES&RPT_FMT=2&start_dt=' + startDate + '&end_dt=' + getMedicareEndDate();
 }
 
 function viewPBSReport() {
@@ -195,12 +200,13 @@ function downloadExcel() {
     alert('No results to generate report for');
     return;
   }
+  const uniqueCodes = [...new Set(pbsCodes)];
   let startDate = '202501';
   if (firstListedDate) {
     const parsed = new Date(firstListedDate);
     if (!isNaN(parsed)) startDate = parsed.toISOString().slice(0, 7).replace('-', '');
   }
-  const itemlst = "''" + ",'" + pbsCodes.join("','") + "',''";
+  const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
   const params = new URLSearchParams({
     pbs_codes: itemlst,
     start_date: startDate,
@@ -268,12 +274,13 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
         }
       });
       if (pbsCodes.length) {
+        const uniqueCodes = [...new Set(pbsCodes)];
         let startDate = '202501';
         if (firstListedDate) {
           const p = new Date(firstListedDate);
           if (!isNaN(p)) startDate = p.toISOString().slice(0, 7).replace('-', '');
         }
-        const itemlst = "''" + ",'"+pbsCodes.join("','")+"',''";
+        const itemlst = "''" + ",'"+ uniqueCodes.join("','") +"',''";
         const params = new URLSearchParams({
           pbs_codes: itemlst,
           start_date: startDate,

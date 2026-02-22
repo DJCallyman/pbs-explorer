@@ -28,8 +28,28 @@
   <div id="results" class="results"></div>
   <div id="report-section" style="display: none; margin-top: 1rem;">
     <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+      <label for="medicare-start-date" style="font-weight: 500; white-space: nowrap;">Stats start date:</label>
+      <input type="month" id="medicare-start-date" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" />
       <label for="medicare-end-date" style="font-weight: 500; white-space: nowrap;">Stats end date:</label>
       <input type="month" id="medicare-end-date" value="{{ medicare_end_date[:4] }}-{{ medicare_end_date[4:] }}" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" />
+    </div>
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+      <label for="report-var" style="font-weight: 500; white-space: nowrap;">Report On:</label>
+      <select id="report-var" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+        <option value="SERVICES" selected>Services</option>
+        <option value="BENEFIT">Benefit</option>
+      </select>
+      <label for="report-format" style="font-weight: 500; white-space: nowrap;">Report Format:</label>
+      <select id="report-format" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+        <option value="1">1 – by scheme (rows) by state (cols)</option>
+        <option value="2" selected>2 – by scheme and month (rows) by state (cols)</option>
+        <option value="3">3 – by scheme and fin. year (rows) by state (cols)</option>
+        <option value="4">4 – by scheme and cal. year (rows) by state (cols)</option>
+        <option value="5">5 – by patient category (cols)</option>
+        <option value="6">6 – by month (rows) by patient category (cols)</option>
+        <option value="7">7 – by fin. year (rows) by patient category (cols)</option>
+        <option value="8">8 – by cal. year (rows) by patient category (cols)</option>
+      </select>
     </div>
     <button type="button" class="btn btn-primary" onclick="viewPBSReport()">
       View Medicare Statistics Report
@@ -59,21 +79,45 @@ function getMedicareEndDate() {
   return '{{ medicare_end_date }}';
 }
 
+function getMedicareStartDate() {
+  const picker = document.getElementById('medicare-start-date');
+  if (picker && picker.value) {
+    return picker.value.replace('-', '');
+  }
+  // Fallback: compute from results (earliest listing date)
+  let earliest = null;
+  document.querySelectorAll('#results tbody tr').forEach(row => {
+    const listedText = row.querySelectorAll('td')[3]?.textContent.trim();
+    if (listedText) {
+      const d = new Date(listedText);
+      if (!isNaN(d) && (!earliest || d < earliest)) earliest = d;
+    }
+  });
+  if (earliest) {
+    return earliest.getFullYear() + String(earliest.getMonth() + 1).padStart(2, '0');
+  }
+  return '202501';
+}
+
+function getReportVar() {
+  const sel = document.getElementById('report-var');
+  return sel ? sel.value : 'SERVICES';
+}
+
+function getReportFormat() {
+  const sel = document.getElementById('report-format');
+  return sel ? sel.value : '2';
+}
+
 function getPBSReportURL() {
   const pbsCodes = [];
-  let firstListedDate = null;
   
   document.querySelectorAll('#results tbody tr').forEach(row => {
     const cells = row.querySelectorAll('td');
     if (cells.length >= 4) {
       const pbsCode = cells[2].textContent.trim();
-      const listedDate = cells[3].textContent.trim();
-      
       if (pbsCode) {
         pbsCodes.push(pbsCode);
-      }
-      if (!firstListedDate && listedDate) {
-        firstListedDate = listedDate;
       }
     }
   });
@@ -84,22 +128,13 @@ function getPBSReportURL() {
   }
 
   const uniqueCodes = [...new Set(pbsCodes)];
-  
-  let startDate = "202501";
-  if (firstListedDate) {
-    const parsed = new Date(firstListedDate);
-    if (!isNaN(parsed)) {
-      startDate = parsed.toISOString().slice(0, 7).replace('-', '');
-    }
-  }
-  
-  const endDate = getMedicareEndDate();
-  
   const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
   const params = new URLSearchParams({
     pbs_codes: itemlst,
-    start_date: startDate,
-    end_date: endDate
+    start_date: getMedicareStartDate(),
+    end_date: getMedicareEndDate(),
+    var: getReportVar(),
+    rpt_fmt: getReportFormat()
   });
   
   return '/web/pbs-report?' + params.toString();
@@ -107,19 +142,13 @@ function getPBSReportURL() {
 
 function getDirectReportURL() {
   const pbsCodes = [];
-  let firstListedDate = null;
   
   document.querySelectorAll('#results tbody tr').forEach(row => {
     const cells = row.querySelectorAll('td');
     if (cells.length >= 4) {
       const pbsCode = cells[2].textContent.trim();
-      const listedDate = cells[3].textContent.trim();
-      
       if (pbsCode) {
         pbsCodes.push(pbsCode);
-      }
-      if (!firstListedDate && listedDate) {
-        firstListedDate = listedDate;
       }
     }
   });
@@ -130,14 +159,6 @@ function getDirectReportURL() {
 
   const uniqueCodes = [...new Set(pbsCodes)];
   
-  let startDate = "202501";
-  if (firstListedDate) {
-    const parsed = new Date(firstListedDate);
-    if (!isNaN(parsed)) {
-      startDate = parsed.toISOString().slice(0, 7).replace('-', '');
-    }
-  }
-  
   const baseURL = 'https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest';
   const program = 'SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report';
   
@@ -146,7 +167,7 @@ function getDirectReportURL() {
   const encodedProgram = encodeURIComponent(program);
   const encodedItemlst = encodeURIComponent(itemlst);
   
-  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + uniqueCodes.length + '&LIST=' + encodeURIComponent(listParam) + '&VAR=SERVICES&RPT_FMT=2&start_dt=' + startDate + '&end_dt=' + getMedicareEndDate();
+  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + uniqueCodes.length + '&LIST=' + encodeURIComponent(listParam) + '&VAR=' + getReportVar() + '&RPT_FMT=' + getReportFormat() + '&start_dt=' + getMedicareStartDate() + '&end_dt=' + getMedicareEndDate();
 }
 
 function viewPBSReport() {
@@ -190,14 +211,11 @@ function copyReportURL() {
 
 function downloadExcel() {
   const pbsCodes = [];
-  let firstListedDate = null;
   document.querySelectorAll('#results tbody tr').forEach(row => {
     const cells = row.querySelectorAll('td');
     if (cells.length >= 4) {
       const pbsCode = cells[2].textContent.trim();
-      const listedDate = cells[3].textContent.trim();
       if (pbsCode) pbsCodes.push(pbsCode);
-      if (!firstListedDate && listedDate) firstListedDate = listedDate;
     }
   });
   if (pbsCodes.length === 0) {
@@ -205,16 +223,13 @@ function downloadExcel() {
     return;
   }
   const uniqueCodes = [...new Set(pbsCodes)];
-  let startDate = '202501';
-  if (firstListedDate) {
-    const parsed = new Date(firstListedDate);
-    if (!isNaN(parsed)) startDate = parsed.toISOString().slice(0, 7).replace('-', '');
-  }
   const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
   const params = new URLSearchParams({
     pbs_codes: itemlst,
-    start_date: startDate,
-    end_date: getMedicareEndDate()
+    start_date: getMedicareStartDate(),
+    end_date: getMedicareEndDate(),
+    var: getReportVar(),
+    rpt_fmt: getReportFormat()
   });
   // Show a loading indicator on the button
   const btn = document.querySelector('[onclick="downloadExcel()"]');
@@ -263,7 +278,7 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     const hasResults = document.querySelectorAll('#results tbody tr').length > 0;
     reportSection.style.display = hasResults ? 'block' : 'none';
 
-    // Set the picker min to the earliest listing date from results
+    // Set the start-date picker to earliest listing date and constrain both pickers
     if (hasResults) {
       let earliestDate = null;
       document.querySelectorAll('#results tbody tr').forEach(row => {
@@ -275,7 +290,14 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
       });
       if (earliestDate) {
         const minVal = earliestDate.getFullYear() + '-' + String(earliestDate.getMonth() + 1).padStart(2, '0');
-        document.getElementById('medicare-end-date').setAttribute('min', minVal);
+        const startPicker = document.getElementById('medicare-start-date');
+        const endPicker = document.getElementById('medicare-end-date');
+        // Default start date = earliest listing date; min = earliest listing date
+        startPicker.value = minVal;
+        startPicker.setAttribute('min', minVal);
+        startPicker.setAttribute('max', endPicker.value);
+        // End-date min = earliest listing date
+        endPicker.setAttribute('min', minVal);
       }
     }
 
@@ -283,28 +305,22 @@ document.body.addEventListener('htmx:afterSwap', function(e) {
     // cached by the time the user clicks "Download Excel".
     if (hasResults) {
       const pbsCodes = [];
-      let firstListedDate = null;
       document.querySelectorAll('#results tbody tr').forEach(row => {
         const cells = row.querySelectorAll('td');
         if (cells.length >= 4) {
           const code = cells[2].textContent.trim();
-          const dated = cells[3].textContent.trim();
           if (code) pbsCodes.push(code);
-          if (!firstListedDate && dated) firstListedDate = dated;
         }
       });
       if (pbsCodes.length) {
         const uniqueCodes = [...new Set(pbsCodes)];
-        let startDate = '202501';
-        if (firstListedDate) {
-          const p = new Date(firstListedDate);
-          if (!isNaN(p)) startDate = p.toISOString().slice(0, 7).replace('-', '');
-        }
         const itemlst = "''" + ",'"+ uniqueCodes.join("','") +"',''";
         const params = new URLSearchParams({
           pbs_codes: itemlst,
-          start_date: startDate,
-          end_date: getMedicareEndDate()
+          start_date: getMedicareStartDate(),
+          end_date: getMedicareEndDate(),
+          var: getReportVar(),
+          rpt_fmt: getReportFormat()
         });
         fetch('/web/pbs-report-warmup?' + params.toString(), { method: 'POST' }).catch(() => {});
       }

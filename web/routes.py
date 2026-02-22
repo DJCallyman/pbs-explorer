@@ -387,15 +387,25 @@ def web_stats(request: Request, db: Session = Depends(get_db)):
     )
 
 
+VALID_VAR = {"SERVICES", "BENEFIT"}
+VALID_RPT_FMT = {"1", "2", "3", "4", "5", "6", "7", "8"}
+
+
 @router.get("/web/pbs-report")
 def pbs_report(
     request: Request,
     pbs_codes: str,
     start_date: str | None = None,
     end_date: str | None = None,
+    var: str = "SERVICES",
+    rpt_fmt: str = "2",
     db: Session = Depends(get_db),
 ):
     """Generate a Medicare Statistics report URL and redirect to it."""
+    if var not in VALID_VAR:
+        raise HTTPException(status_code=400, detail=f"Invalid var: {var}. Must be one of {VALID_VAR}")
+    if rpt_fmt not in VALID_RPT_FMT:
+        raise HTTPException(status_code=400, detail=f"Invalid rpt_fmt: {rpt_fmt}. Must be one of {VALID_RPT_FMT}")
     # Parse PBS codes (comma-separated, optionally quoted)
     import re
     codes = re.findall(r"'([^',]+)'", pbs_codes)
@@ -430,7 +440,7 @@ def pbs_report(
     list_param = ",".join(codes)
     
     # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, LIST, VAR, RPT_FMT, start_dt, end_dt
-    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&LIST=" + quote(list_param, safe='') + "&VAR=SERVICES&RPT_FMT=2&start_dt=" + start_date + "&end_dt=" + end_date
+    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&LIST=" + quote(list_param, safe='') + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt + "&start_dt=" + start_date + "&end_dt=" + end_date
     
     return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -441,6 +451,8 @@ async def pbs_report_warmup(
     pbs_codes: str,
     start_date: str | None = None,
     end_date: str | None = None,
+    var: str = "SERVICES",
+    rpt_fmt: str = "2",
     db: Session = Depends(get_db),
 ):
     """Fire-and-forget: hit the SAS server to trigger report generation
@@ -472,13 +484,19 @@ async def pbs_report_warmup(
     program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
     itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
     list_param = ",".join(codes)
+    # Sanitise var / rpt_fmt – fall back to defaults for the non-critical warmup
+    if var not in VALID_VAR:
+        var = "SERVICES"
+    if rpt_fmt not in VALID_RPT_FMT:
+        rpt_fmt = "2"
+
     report_url = (
         base_url
         + "?_PROGRAM=" + quote(program, safe="")
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
         + "&LIST=" + quote(list_param, safe="")
-        + "&VAR=SERVICES&RPT_FMT=2"
+        + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date
     )
@@ -510,6 +528,8 @@ async def pbs_report_excel(
     pbs_codes: str,
     start_date: str | None = None,
     end_date: str | None = None,
+    var: str = "SERVICES",
+    rpt_fmt: str = "2",
     db: Session = Depends(get_db),
 ):
     """Fetch the Medicare Statistics report server-side, extract the
@@ -535,6 +555,11 @@ async def pbs_report_excel(
     if not codes:
         raise HTTPException(status_code=400, detail="No PBS codes provided")
 
+    if var not in VALID_VAR:
+        raise HTTPException(status_code=400, detail=f"Invalid var: {var}. Must be one of {VALID_VAR}")
+    if rpt_fmt not in VALID_RPT_FMT:
+        raise HTTPException(status_code=400, detail=f"Invalid rpt_fmt: {rpt_fmt}. Must be one of {VALID_RPT_FMT}")
+
     if not start_date:
         earliest = db.execute(
             select(func.min(Item.first_listed_date))
@@ -554,7 +579,7 @@ async def pbs_report_excel(
         + "&itemlst=" + itemlst
         + "&ITEMCNT=" + str(len(codes))
         + "&LIST=" + quote(list_param, safe="")
-        + "&VAR=SERVICES&RPT_FMT=2"
+        + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt
         + "&start_dt=" + start_date
         + "&end_dt=" + end_date
     )

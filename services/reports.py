@@ -28,7 +28,10 @@ def items_by_program(db: Session) -> List[Dict[str, Any]]:
         .group_by(Item.program_code)
         .order_by(func.count(Item.li_item_id).desc())
     ).all()
-    return [{"program_code": r.program_code, "count": r.count} for r in rows]
+    return [
+        {"program_code": r.program_code if r.program_code is not None else "(none)", "count": r.count}
+        for r in rows
+    ]
 
 
 def items_by_benefit_type(db: Session) -> List[Dict[str, Any]]:

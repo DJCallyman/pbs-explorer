@@ -25,7 +25,7 @@ class SyncSettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     type: str = Field(default="sqlite")
-    path: str = Field(default="pbs_data.db")
+    path: str = Field(default="data/pbs_data.db")
     host: Optional[str] = None
     port: int = 5432
     database: str = Field(default="pbs_explorer")
@@ -37,7 +37,16 @@ class ServerSettings(BaseModel):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
     debug: bool = False
-    allow_origins: List[str] = Field(default_factory=lambda: ["http://localhost:8000"])
+    # NOTE: The default CORS allow_origins was changed from ["*"] to ["http://localhost:8000"]
+    # for improved security. To configure CORS in production (for example, to restore a
+    # permissive setting or to specify multiple allowed origins), set the
+    # PBS_EXPLORER_SERVER_ALLOW_ORIGINS environment variable to a comma-separated list,
+    # e.g. "https://example.com,https://admin.example.com" or "*".
+    allow_origins: List[str] = Field(
+        default_factory=lambda: os.getenv(
+            "PBS_EXPLORER_SERVER_ALLOW_ORIGINS", "http://localhost:8000"
+        ).split(",")
+    )
     allow_credentials: bool = True
     allow_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT"])
     allow_headers: List[str] = Field(default_factory=lambda: ["*"])

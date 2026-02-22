@@ -37,15 +37,17 @@ class ServerSettings(BaseModel):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
     debug: bool = False
-    allow_origins: List[str] = Field(default_factory=lambda: ["*"])
+    allow_origins: List[str] = Field(default_factory=lambda: ["http://localhost:8000"])
     allow_credentials: bool = True
     allow_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT"])
     allow_headers: List[str] = Field(default_factory=lambda: ["*"])
+    admin_api_key: str = Field(default="")
 
 
 class LoggingSettings(BaseModel):
     level: str = Field(default="INFO")
     format: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    json_output: bool = Field(default=False)
 
 
 class Settings(BaseModel):
@@ -111,8 +113,10 @@ def get_settings() -> Settings:
     )
     settings.server.allow_methods = _get_list("SERVER_ALLOW_METHODS", settings.server.allow_methods)
     settings.server.allow_headers = _get_list("SERVER_ALLOW_HEADERS", settings.server.allow_headers)
+    settings.server.admin_api_key = _get_env("ADMIN_API_KEY", settings.server.admin_api_key) or ""
 
     settings.logging.level = _get_env("LOG_LEVEL", settings.logging.level) or settings.logging.level
     settings.logging.format = _get_env("LOG_FORMAT", settings.logging.format) or settings.logging.format
+    settings.logging.json_output = _get_bool("LOG_JSON", settings.logging.json_output)
 
     return settings

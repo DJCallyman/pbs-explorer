@@ -42,5 +42,5 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    print("Syncing relationship data only (should be ~5-10 minutes)...")
+    logging.getLogger(__name__).info("Syncing relationship data only (should be ~5-10 minutes)...")
     asyncio.run(run_relationship_sync())

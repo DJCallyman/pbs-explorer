@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     li_item_id: str
     schedule_code: Optional[str] = None
     drug_name: Optional[str] = None
@@ -17,5 +19,3 @@ class ItemOut(BaseModel):
     determined_price: Optional[float] = None
     first_listed_date: Optional[date] = None
 
-    class Config:
-        orm_mode = True

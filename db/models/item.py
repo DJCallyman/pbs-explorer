@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Date, Integer, Numeric, String, TIMESTAMP
+from sqlalchemy import Column, Date, Index, Integer, Numeric, String, TIMESTAMP
 
 from db.base import Base
 
 
 class Item(Base):
     __tablename__ = "item"
+    __table_args__ = (
+        Index("ix_item_drug_name", "drug_name"),
+        Index("ix_item_brand_name", "brand_name"),
+        Index("ix_item_pbs_code", "pbs_code"),
+        Index("ix_item_program_code", "program_code"),
+        Index("ix_item_benefit_type_code", "benefit_type_code"),
+    )
 
     li_item_id = Column(String(100), primary_key=True)
     schedule_code = Column(String(20))

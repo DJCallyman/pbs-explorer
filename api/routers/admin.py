@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import AsyncGenerator, List
+from datetime import datetime, timezone
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
@@ -134,7 +134,7 @@ async def sync_full(db: Session = Depends(get_db)) -> dict:
     return {
         "status": "accepted",
         "type": "full",
-        "requested_at": datetime.utcnow().isoformat(),
+        "requested_at": datetime.now(timezone.utc).isoformat(),
         "message": "Full sync started in background. Check status endpoint for progress.",
     }
 
@@ -170,7 +170,7 @@ async def sync_endpoints(request: SyncEndpointsRequest, db: Session = Depends(ge
         "status": "accepted",
         "type": "endpoints",
         "endpoints": request.endpoints,
-        "requested_at": datetime.utcnow().isoformat(),
+        "requested_at": datetime.now(timezone.utc).isoformat(),
         "message": f"Sync of {len(request.endpoints)} endpoint(s) started in background. Check status endpoint for progress.",
     }
 
@@ -197,7 +197,7 @@ async def sync_incremental(db: Session = Depends(get_db)) -> dict:
     return {
         "status": "accepted",
         "type": "incremental",
-        "requested_at": datetime.utcnow().isoformat(),
+        "requested_at": datetime.now(timezone.utc).isoformat(),
         "message": "Incremental sync started in background. Check status endpoint for progress.",
     }
 
@@ -290,7 +290,7 @@ class UpdateSettingRequest(BaseModel):
 def get_medicare_end_date(db: Session = Depends(get_db)) -> dict:
     from db.models.app_setting import AppSetting
     row = db.execute(
-        __import__("sqlalchemy").select(AppSetting.value)
+        select(AppSetting.value)
         .where(AppSetting.key == "medicare_stats_end_date")
     ).scalar()
     return {"end_date": row or "202511"}
@@ -299,7 +299,6 @@ def get_medicare_end_date(db: Session = Depends(get_db)) -> dict:
 @router.put("/settings/medicare-end-date")
 def update_medicare_end_date(body: UpdateSettingRequest, db: Session = Depends(get_db)) -> dict:
     import re
-    from datetime import datetime, timezone
     from db.models.app_setting import AppSetting
 
     value = body.value.strip()
@@ -307,7 +306,7 @@ def update_medicare_end_date(body: UpdateSettingRequest, db: Session = Depends(g
         raise HTTPException(status_code=400, detail="Value must be in YYYYMM format, e.g. 202511")
 
     existing = db.execute(
-        __import__("sqlalchemy").select(AppSetting)
+        select(AppSetting)
         .where(AppSetting.key == "medicare_stats_end_date")
     ).scalar_one_or_none()
 

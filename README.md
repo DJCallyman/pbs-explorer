@@ -26,7 +26,7 @@ pip install -r requirements.txt
 You can override settings using environment variables (prefix `PBS_EXPLORER_`), for example:
 
 ```bash
-export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="2384af7c667342ceb5a736fe29f1dc6b"
+export PBS_EXPLORER_PBS_SUBSCRIPTION_KEY="your_subscription_key_here"
 export PBS_EXPLORER_DB_TYPE=sqlite
 export PBS_EXPLORER_DB_PATH=./pbs_data.db
 export PBS_EXPLORER_LOG_LEVEL=INFO
@@ -127,7 +127,7 @@ If using Nginx Proxy Manager or similar:
 
 ## Database Migrations
 
-Migrations must be run manually:
+Migrations run automatically when the container starts. To run them manually:
 
 ```bash
 # Inside the container
@@ -153,5 +153,5 @@ python -m tasks.sync
 
 - SQLite is used by default; update environment variables for PostgreSQL.
 - Health endpoint is available at `/api/v1/health`.
-- The container supports both AMD64 and ARM64 architectures (MacBook, Raspberry Pi, etc.).
+- The container supports both AMD64 and ARM64 architectures (Windows PCs, Intel Macs, Apple Silicon Macs, Raspberry Pi, etc.).
 - Pre-built images are available at `ghcr.io/djcallyman/pbs-explorer:latest`.

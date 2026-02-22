@@ -81,3 +81,6 @@ pytest.ini
 
 # Large data files
 pbs-api-public-v3.yaml
+unraid-template.xml
+LICENSE
+CONTRIBUTING.md

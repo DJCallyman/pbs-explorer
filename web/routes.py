@@ -137,7 +137,7 @@ def reports(request: Request):
 
 @router.get("/reports/items-by-program")
 def reports_items_by_program(request: Request, db: Session = Depends(get_db)):
-    data = [{"program_code": r["program_code"] or "(none)", "count": r["count"]} for r in _items_by_program(db)]
+    data = [{"program_code": r.get("program_code") or "(none)", "count": r["count"]} for r in _items_by_program(db)]
     columns = [{"key": "program_code", "label": "Program"}, {"key": "count", "label": "Item Count"}]
     return templates.TemplateResponse(
         "partials/report_list.html",

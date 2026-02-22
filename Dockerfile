@@ -10,11 +10,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run as non-root user
+# Create non-root user and writable data directory
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
-    && mkdir -p /app/data && chown -R appuser:appgroup /app/data
-USER appuser
+    && mkdir -p /app/data && chown -R appuser:appgroup /app/data \
+    && chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+# Entrypoint runs as root to fix volume permissions, then drops to appuser
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]

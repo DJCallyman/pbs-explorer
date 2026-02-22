@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Dict, Iterable, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -62,7 +62,7 @@ class SyncOrchestrator:
         endpoint_start = time.time()
         self.status.in_progress = True
         self.status.current_endpoint = endpoint
-        self.status.last_run_at = datetime.utcnow()
+        self.status.last_run_at = datetime.now(timezone.utc)
 
         self.logger.info(f"Starting sync for endpoint: {endpoint}")
 
@@ -142,7 +142,7 @@ class SyncOrchestrator:
                     break
 
         self.status.records_processed += synced_count
-        self.status.last_success_at = datetime.utcnow()
+        self.status.last_success_at = datetime.now(timezone.utc)
         self.status.in_progress = False
         self.status.current_endpoint = None
 
@@ -226,7 +226,7 @@ class SyncOrchestrator:
 
         # Mark sync as complete
         self.status.in_progress = False
-        self.status.last_success_at = datetime.utcnow()
+        self.status.last_success_at = datetime.now(timezone.utc)
         self.status.current_endpoint = None
 
         return results
@@ -299,7 +299,7 @@ class SyncOrchestrator:
 
         # Mark sync as complete
         self.status.in_progress = False
-        self.status.last_success_at = datetime.utcnow()
+        self.status.last_success_at = datetime.now(timezone.utc)
         self.status.current_endpoint = None
 
         return results
@@ -428,7 +428,7 @@ class SyncOrchestrator:
 
         # Mark sync as complete
         self.status.in_progress = False
-        self.status.last_success_at = datetime.utcnow()
+        self.status.last_success_at = datetime.now(timezone.utc)
         self.status.current_endpoint = None
 
         return results
@@ -456,7 +456,7 @@ class SyncOrchestrator:
 
         if existing:
             existing.last_synced_schedule_code = schedule_to_record
-            existing.last_synced_at = datetime.utcnow()
+            existing.last_synced_at = datetime.now(timezone.utc)
             existing.records_synced = records_synced
             existing.records_fetched = records_fetched
             existing.sync_type = sync_type
@@ -464,7 +464,7 @@ class SyncOrchestrator:
             sync_state = SyncState(
                 endpoint=endpoint,
                 last_synced_schedule_code=schedule_to_record,
-                last_synced_at=datetime.utcnow(),
+                last_synced_at=datetime.now(timezone.utc),
                 records_synced=records_synced,
                 records_fetched=records_fetched,
                 sync_type=sync_type,

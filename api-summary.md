@@ -2,7 +2,7 @@
 
 ## Key Details
 - **Base URL**: `https://data-api.health.gov.au/pbs/api/v3/`
-- **Authentication**: Requires a `subscription-key` header (stored as a collection variable: `2384af7c667342ceb5a736fe29f1dc6b`).
+- **Authentication**: Requires a `subscription-key` header. See `.env.example` for configuration.
 - **Response Format**: Primarily CSV (via `Accept: text/csv` header), though some endpoints may support JSON.
 - **Common Query Parameters**:
   - `schedule_code`: Filters data by a specific PBS schedule (e.g., set dynamically from the `/schedules` endpoint).

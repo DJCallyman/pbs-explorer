@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   pbs-explorer:
     image: ghcr.io/djcallyman/pbs-explorer:latest

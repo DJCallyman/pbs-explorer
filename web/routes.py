@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re as _re
+import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode, quote
 
@@ -16,6 +18,22 @@ from db.models import ATCCode, Item, Indication, Organisation, PrescribingText, 
 from db.models.app_setting import AppSetting
 from services.sync.status_store import status_store
 from services.sync.orchestrator import SyncOrchestrator
+from services.reports import (
+    items_by_program as _items_by_program,
+    items_by_benefit_type as _items_by_benefit_type,
+    items_by_atc_level as _items_by_atc_level,
+    price_changes as _price_changes,
+    restriction_changes as _restriction_changes,
+    parse_pbs_codes,
+    resolve_start_date,
+    build_report_url,
+    build_csv_download_url,
+    VALID_VAR,
+    VALID_RPT_FMT,
+)
+from utils import escape_like
+
+logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
@@ -23,15 +41,16 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter(include_in_schema=False)
 
-DEFAULT_MEDICARE_END_DATE = "202511"
-
 
 def _get_medicare_end_date(db: Session) -> str:
-    """Read the medicare_stats_end_date setting from the DB, with fallback."""
+    """Read the medicare_stats_end_date setting from the DB, with dynamic fallback."""
     row = db.execute(
         select(AppSetting.value).where(AppSetting.key == "medicare_stats_end_date")
     ).scalar()
-    return row or DEFAULT_MEDICARE_END_DATE
+    if row:
+        return row
+    # Dynamic fallback: current month in YYYYMM format
+    return datetime.now(timezone.utc).strftime("%Y%m")
 
 
 @router.get("/web/settings/medicare-end-date")
@@ -118,12 +137,7 @@ def reports(request: Request):
 
 @router.get("/reports/items-by-program")
 def reports_items_by_program(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(Item.program_code, func.count(Item.li_item_id).label("count"))
-        .group_by(Item.program_code)
-        .order_by(func.count(Item.li_item_id).desc())
-    ).all()
-    data = [{"program_code": r.program_code or "(none)", "count": r.count} for r in rows]
+    data = [{"program_code": r["program_code"] or "(none)", "count": r["count"]} for r in _items_by_program(db)]
     columns = [{"key": "program_code", "label": "Program"}, {"key": "count", "label": "Item Count"}]
     return templates.TemplateResponse(
         "partials/report_list.html",
@@ -133,13 +147,7 @@ def reports_items_by_program(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/reports/items-by-benefit-type")
 def reports_items_by_benefit_type(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(Item.benefit_type_code, func.count(Item.li_item_id).label("count"))
-        .where(Item.benefit_type_code.isnot(None))
-        .group_by(Item.benefit_type_code)
-        .order_by(func.count(Item.li_item_id).desc())
-    ).all()
-    data = [{"benefit_type_code": r.benefit_type_code, "count": r.count} for r in rows]
+    data = _items_by_benefit_type(db)
     columns = [{"key": "benefit_type_code", "label": "Benefit Type"}, {"key": "count", "label": "Item Count"}]
     return templates.TemplateResponse(
         "partials/report_list.html",
@@ -149,13 +157,7 @@ def reports_items_by_benefit_type(request: Request, db: Session = Depends(get_db
 
 @router.get("/reports/items-by-atc-level")
 def reports_items_by_atc_level(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(ATCCode.atc_level, func.count(ATCCode.atc_code).label("count"))
-        .where(ATCCode.atc_level.isnot(None))
-        .group_by(ATCCode.atc_level)
-        .order_by(ATCCode.atc_level)
-    ).all()
-    data = [{"atc_level": r.atc_level, "count": r.count} for r in rows]
+    data = _items_by_atc_level(db)
     columns = [{"key": "atc_level", "label": "ATC Level"}, {"key": "count", "label": "Code Count"}]
     return templates.TemplateResponse(
         "partials/report_list.html",
@@ -165,28 +167,7 @@ def reports_items_by_atc_level(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/reports/price-changes")
 def reports_price_changes(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(
-            Item.pbs_code,
-            Item.drug_name,
-            Item.brand_name,
-            Item.determined_price,
-            Item.updated_at,
-        )
-        .where(Item.updated_at.isnot(None))
-        .order_by(Item.updated_at.desc())
-        .limit(100)
-    ).all()
-    data = [
-        {
-            "pbs_code": r.pbs_code,
-            "drug_name": r.drug_name,
-            "brand_name": r.brand_name,
-            "price": str(r.determined_price) if r.determined_price else "",
-            "updated": r.updated_at.strftime("%Y-%m-%d %H:%M") if r.updated_at else "",
-        }
-        for r in rows
-    ]
+    data = _price_changes(db)
     columns = [
         {"key": "pbs_code", "label": "PBS Code"},
         {"key": "drug_name", "label": "Drug"},
@@ -202,28 +183,7 @@ def reports_price_changes(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/reports/restriction-changes")
 def reports_restriction_changes(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(
-            SummaryOfChange.changed_table,
-            SummaryOfChange.change_type,
-            SummaryOfChange.changed_endpoint,
-            SummaryOfChange.source_schedule_code,
-            SummaryOfChange.schedule_code,
-        )
-        .where(SummaryOfChange.changed_endpoint.like("%restriction%"))
-        .order_by(SummaryOfChange.schedule_code.desc())
-        .limit(100)
-    ).all()
-    data = [
-        {
-            "table": r.changed_table,
-            "change_type": r.change_type,
-            "endpoint": r.changed_endpoint,
-            "from_schedule": r.source_schedule_code,
-            "to_schedule": r.schedule_code,
-        }
-        for r in rows
-    ]
+    data = _restriction_changes(db)
     columns = [
         {"key": "table", "label": "Table"},
         {"key": "change_type", "label": "Change Type"},
@@ -262,11 +222,11 @@ def web_items(
     query = select(Item).distinct()
     
     if drug_name:
-        query = query.where(Item.drug_name.ilike(f"%{drug_name}%"))
+        query = query.where(Item.drug_name.ilike(f"%{escape_like(drug_name)}%"))
     if brand_name:
-        query = query.where(Item.brand_name.ilike(f"%{brand_name}%"))
+        query = query.where(Item.brand_name.ilike(f"%{escape_like(brand_name)}%"))
     if pbs_code:
-        query = query.where(Item.pbs_code.ilike(f"%{pbs_code}%"))
+        query = query.where(Item.pbs_code.ilike(f"%{escape_like(pbs_code)}%"))
     if program_code:
         query = query.where(Item.program_code == program_code)
     if benefit_type_code:
@@ -288,7 +248,7 @@ def web_items(
                 Indication,
                 RestrictionPrescribingTextRelationship.prescribing_text_id == Indication.indication_prescribing_txt_id
             )
-            .where(Indication.condition.ilike(f"%{indication}%"))
+            .where(Indication.condition.ilike(f"%{escape_like(indication)}%"))
             .distinct()
         )
         query = query.where(Item.pbs_code.in_(ind_subq))
@@ -309,46 +269,53 @@ def web_items(
                 Indication,
                 RestrictionPrescribingTextRelationship.prescribing_text_id == Indication.indication_prescribing_txt_id
             )
-            .where(Indication.severity.ilike(f"%{severity}%"))
+            .where(Indication.severity.ilike(f"%{escape_like(severity)}%"))
             .distinct()
         )
         query = query.where(Item.pbs_code.in_(sev_subq))
 
     items = db.execute(query.limit(50)).scalars().all()
-    
-    items_with_data = []
-    for item in items:
-        # Get indications via the proper relationship chain:
-        # item -> item_restriction_relationship -> restriction_prescribing_text_relationship -> indication
-        # Also join PrescribingText for prescribing_type
-        from db.models.relationships import (
-            ItemRestrictionRelationship,
-            RestrictionPrescribingTextRelationship,
-        )
-        
-        indication_data = db.execute(
-            select(Indication.condition, Indication.severity, PrescribingText.prescribing_type)
+
+    # --- Fix N+1: batch-fetch indication data for ALL items in one query ---
+    pbs_codes = [item.pbs_code for item in items if item.pbs_code]
+    indication_map: dict[str, dict] = {}
+
+    if pbs_codes:
+        indication_rows = db.execute(
+            select(
+                ItemRestrictionRelationship.pbs_code,
+                Indication.condition,
+                Indication.severity,
+                PrescribingText.prescribing_type,
+            )
             .join(
                 RestrictionPrescribingTextRelationship,
-                Indication.indication_prescribing_txt_id == RestrictionPrescribingTextRelationship.prescribing_text_id
+                Indication.indication_prescribing_txt_id == RestrictionPrescribingTextRelationship.prescribing_text_id,
             )
             .join(
                 PrescribingText,
-                RestrictionPrescribingTextRelationship.prescribing_text_id == PrescribingText.prescribing_txt_id
+                RestrictionPrescribingTextRelationship.prescribing_text_id == PrescribingText.prescribing_txt_id,
             )
             .join(
                 ItemRestrictionRelationship,
-                RestrictionPrescribingTextRelationship.res_code == ItemRestrictionRelationship.res_code
+                RestrictionPrescribingTextRelationship.res_code == ItemRestrictionRelationship.res_code,
             )
-            .where(ItemRestrictionRelationship.pbs_code == item.pbs_code)
+            .where(ItemRestrictionRelationship.pbs_code.in_(pbs_codes))
             .distinct()
-            .limit(3)
         ).all()
-        
-        conditions = [row.condition for row in indication_data if row.condition]
-        severities = [row.severity for row in indication_data if row.severity]
-        prescribing_types = [row.prescribing_type for row in indication_data if row.prescribing_type]
-        
+
+        for row in indication_rows:
+            entry = indication_map.setdefault(row.pbs_code, {"conditions": [], "severities": [], "types": []})
+            if row.condition and row.condition not in entry["conditions"]:
+                entry["conditions"].append(row.condition)
+            if row.severity and row.severity not in entry["severities"]:
+                entry["severities"].append(row.severity)
+            if row.prescribing_type and row.prescribing_type not in entry["types"]:
+                entry["types"].append(row.prescribing_type)
+    
+    items_with_data = []
+    for item in items:
+        ind = indication_map.get(item.pbs_code, {})
         item_dict = {
             "li_item_id": item.li_item_id,
             "drug_name": item.drug_name,
@@ -359,9 +326,9 @@ def web_items(
             "determined_price": item.determined_price,
             "first_listed_date": item.first_listed_date,
             "maximum_amount": item.maximum_amount,
-            "indications": "; ".join(conditions) if conditions else "",
-            "severity": "; ".join(severities) if severities else "",
-            "prescribing_type": "; ".join(prescribing_types) if prescribing_types else "",
+            "indications": "; ".join(ind.get("conditions", [])[:3]),
+            "severity": "; ".join(ind.get("severities", [])[:3]),
+            "prescribing_type": "; ".join(ind.get("types", [])[:3]),
         }
         items_with_data.append(item_dict)
     
@@ -406,42 +373,16 @@ def pbs_report(
         raise HTTPException(status_code=400, detail=f"Invalid var: {var}. Must be one of {VALID_VAR}")
     if rpt_fmt not in VALID_RPT_FMT:
         raise HTTPException(status_code=400, detail=f"Invalid rpt_fmt: {rpt_fmt}. Must be one of {VALID_RPT_FMT}")
-    # Parse PBS codes (comma-separated, optionally quoted)
-    import re
-    codes = re.findall(r"'([^',]+)'", pbs_codes)
-    if not codes:
-        codes = pbs_codes.split(',')
-    codes = [c.strip() for c in codes if c.strip()]
-    
+
+    codes = parse_pbs_codes(pbs_codes)
     if not codes:
         raise HTTPException(status_code=400, detail="No PBS codes provided")
-    
-    # Get earliest first_listed_date from items if not provided
-    if not start_date:
-        earliest = db.execute(
-            select(func.min(Item.first_listed_date))
-            .where(Item.pbs_code.in_(codes))
-        ).scalar_one_or_none()
-        if earliest:
-            start_date = earliest.strftime("%Y%m")
-        else:
-            start_date = "202501"
-    
-    # Use provided end_date or DB setting
+
+    start_date = resolve_start_date(db, codes, start_date)
     if not end_date:
         end_date = _get_medicare_end_date(db)
-    
-    # Build the report URL - exact format matching working URL
-    base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
-    program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    
-    # Format: codes zero-padded to 6 chars, e.g. '08213G' for 5-char code, '13135H' unchanged
-    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
-    list_param = ",".join(codes)
-    
-    # Build URL in exact order: _PROGRAM, itemlst, ITEMCNT, LIST, VAR, RPT_FMT, start_dt, end_dt
-    redirect_url = base_url + "?_PROGRAM=" + quote(program, safe='') + "&itemlst=" + itemlst + "&ITEMCNT=" + str(len(codes)) + "&LIST=" + quote(list_param, safe='') + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt + "&start_dt=" + start_date + "&end_dt=" + end_date
-    
+
+    redirect_url = build_report_url(codes, start_date, end_date, var, rpt_fmt)
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
@@ -459,47 +400,23 @@ async def pbs_report_warmup(
     so the result is cached by the time the user clicks Download Excel.
     Returns 202 immediately; the actual request runs in the background.
     """
-    import re
     import asyncio
-    import logging
-    logger = logging.getLogger(__name__)
 
-    codes = re.findall(r"'([^',]+)'", pbs_codes)
-    if not codes:
-        codes = pbs_codes.split(",")
-    codes = [c.strip() for c in codes if c.strip()]
+    codes = parse_pbs_codes(pbs_codes)
     if not codes:
         return Response(status_code=202)
 
-    if not start_date:
-        earliest = db.execute(
-            select(func.min(Item.first_listed_date))
-            .where(Item.pbs_code.in_(codes))
-        ).scalar_one_or_none()
-        start_date = earliest.strftime("%Y%m") if earliest else "202501"
+    start_date = resolve_start_date(db, codes, start_date)
     if not end_date:
         end_date = _get_medicare_end_date(db)
 
-    base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
-    program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
-    list_param = ",".join(codes)
     # Sanitise var / rpt_fmt – fall back to defaults for the non-critical warmup
     if var not in VALID_VAR:
         var = "SERVICES"
     if rpt_fmt not in VALID_RPT_FMT:
         rpt_fmt = "2"
 
-    report_url = (
-        base_url
-        + "?_PROGRAM=" + quote(program, safe="")
-        + "&itemlst=" + itemlst
-        + "&ITEMCNT=" + str(len(codes))
-        + "&LIST=" + quote(list_param, safe="")
-        + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt
-        + "&start_dt=" + start_date
-        + "&end_dt=" + end_date
-    )
+    report_url = build_report_url(codes, start_date, end_date, var, rpt_fmt)
 
     async def _warmup():
         """Background task: hit SAS to warm the cache, ignore result."""
@@ -544,14 +461,9 @@ async def pbs_report_excel(
     """
     import re
     import asyncio
-    import logging
     import time
-    logger = logging.getLogger(__name__)
 
-    codes = re.findall(r"'([^',]+)'", pbs_codes)
-    if not codes:
-        codes = pbs_codes.split(",")
-    codes = [c.strip() for c in codes if c.strip()]
+    codes = parse_pbs_codes(pbs_codes)
     if not codes:
         raise HTTPException(status_code=400, detail="No PBS codes provided")
 
@@ -560,29 +472,11 @@ async def pbs_report_excel(
     if rpt_fmt not in VALID_RPT_FMT:
         raise HTTPException(status_code=400, detail=f"Invalid rpt_fmt: {rpt_fmt}. Must be one of {VALID_RPT_FMT}")
 
-    if not start_date:
-        earliest = db.execute(
-            select(func.min(Item.first_listed_date))
-            .where(Item.pbs_code.in_(codes))
-        ).scalar_one_or_none()
-        start_date = earliest.strftime("%Y%m") if earliest else "202501"
+    start_date = resolve_start_date(db, codes, start_date)
     if not end_date:
         end_date = _get_medicare_end_date(db)
 
-    base_url = "https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest"
-    program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report"
-    itemlst = ",".join(f"'{c.zfill(6)}'" for c in codes)
-    list_param = ",".join(codes)
-    report_url = (
-        base_url
-        + "?_PROGRAM=" + quote(program, safe="")
-        + "&itemlst=" + itemlst
-        + "&ITEMCNT=" + str(len(codes))
-        + "&LIST=" + quote(list_param, safe="")
-        + "&VAR=" + var + "&RPT_FMT=" + rpt_fmt
-        + "&start_dt=" + start_date
-        + "&end_dt=" + end_date
-    )
+    report_url = build_report_url(codes, start_date, end_date, var, rpt_fmt)
 
     async def _strip_referer(request: httpx.Request) -> None:
         if "referer" in request.headers:
@@ -630,14 +524,7 @@ async def pbs_report_excel(
                 logger.info("[attempt %d/%d] report_name=%s", attempt, MAX_ATTEMPTS, report_name)
 
                 # Step 2 – request the CSV/Excel download
-                csv_program = "SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/mbs_csv"
-                csv_url = (
-                    base_url
-                    + "?_PROGRAM=" + quote(csv_program, safe="")
-                    + "&report_name=" + quote(report_name, safe="")
-                    + "&title1=" + quote(title1, safe="")
-                    + "&mca_pgm=PBS"
-                )
+                csv_url = build_csv_download_url(report_name, title1)
                 logger.info("[attempt %d/%d] Fetching Excel file…", attempt, MAX_ATTEMPTS)
                 csv_resp = await client.get(csv_url)
                 t2 = time.monotonic()

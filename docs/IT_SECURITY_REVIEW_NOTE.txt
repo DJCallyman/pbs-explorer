@@ -1,0 +1,76 @@
+PBS Explorer
+IT Security Review Note
+
+Purpose
+PBS Explorer is a browser-based analytics tool used to search, review, and export Australian PBS-related data. It is intended for read-oriented analysis and reporting rather than general file sharing, remote administration, or software distribution.
+
+Hosting Model
+The application is hosted on a personal Mac mini and published over HTTPS through a Caddy reverse proxy.
+
+Network exposure is limited to:
+- HTTPS on standard web ports 80 and 443
+
+The application itself is not directly exposed to the internet. It runs only on:
+- 127.0.0.1:8000
+
+This means inbound traffic terminates at the reverse proxy, not at the internal application service port.
+
+Authentication and Access Control
+The application requires authenticated sign-in for browser access.
+
+Security controls in place include:
+- HTTPS/TLS via Caddy
+- Authenticated user login for application access
+- Admin-only protection for privileged functions
+- Trusted host validation
+- Login throttling to reduce brute-force risk
+- Session cookies configured as HttpOnly, SameSite=Lax, and Secure when accessed via HTTPS
+
+Password Security
+Managed user passwords are not stored in plaintext.
+
+Passwords are stored as:
+- Salted PBKDF2-HMAC-SHA256 hashes
+
+This means stored credentials are not directly recoverable from the application data store.
+
+Browser and Response Security
+The application sets standard protective response headers, including protections related to:
+- Framing
+- Content type sniffing
+- Referrer behavior
+- Content Security Policy restrictions on framing
+
+These controls help reduce common browser-side attack surfaces.
+
+Functional Behavior
+The main user functions are:
+- Search and browse PBS-related records
+- Review metadata and schedules
+- Refresh source metadata from upstream data sources
+- Export results to CSV
+
+The application does not require:
+- Browser plugins
+- Local executable downloads
+- Elevated workstation privileges
+
+Data Export Behavior
+CSV export is intentional application functionality.
+
+Some saved report URLs can be used for controlled Excel/Power Query refresh scenarios. These links use report-specific access tokens and are limited in scope to the relevant report export, rather than granting broad application access.
+
+No direct access is exposed for:
+- SSH
+- Database ports
+- Internal application ports
+
+Corporate Filtering Considerations
+The most likely reasons a corporate web security system may classify this service as higher risk are operational rather than malicious:
+- The service is currently home-hosted
+- It is published using a DuckDNS hostname
+- It presents an authenticated login page
+- It supports CSV downloads
+
+Residual Risk Summary
+From an application-security perspective, the service is a relatively narrow authenticated web application with standard HTTPS protection, hashed passwords, session controls, login throttling, and limited network exposure.

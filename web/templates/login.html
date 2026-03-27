@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="login-page">
+  <div class="login-card">
+    <div class="page-hero">
+      <div>
+        <h2 class="page-title-strong">PBS Explorer Login</h2>
+      </div>
+    </div>
+    {% if error %}
+      <div class="error-box">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login" class="search-form login-form">
+      <input type="hidden" name="next" value="{{ next_target }}" />
+      <label class="field">
+        <span>User ID</span>
+        <input type="text" name="username" autocomplete="username" required />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <div class="login-actions">
+        <button type="submit" class="btn btn-secondary">Sign In</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

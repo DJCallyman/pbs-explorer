@@ -9,7 +9,7 @@ class Restriction(Base):
     __tablename__ = "restriction"
 
     res_code = Column(String(100), primary_key=True)
-    schedule_code = Column(String(20))
+    schedule_code = Column(String(20), primary_key=True)
     restriction_number = Column(Integer)
     treatment_of_code = Column(Integer)
     authority_method = Column(String(50))

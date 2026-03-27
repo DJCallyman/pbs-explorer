@@ -34,7 +34,7 @@ class DatabaseSettings(BaseModel):
 
 
 class ServerSettings(BaseModel):
-    host: str = Field(default="0.0.0.0")
+    host: str = Field(default="127.0.0.1")
     port: int = Field(default=8000)
     debug: bool = False
     # NOTE: The default CORS allow_origins was changed from ["*"] to ["http://localhost:8000"]
@@ -47,10 +47,19 @@ class ServerSettings(BaseModel):
             "PBS_EXPLORER_SERVER_ALLOW_ORIGINS", "http://localhost:8000"
         ).split(",")
     )
-    allow_credentials: bool = True
+    allow_credentials: bool = False
     allow_methods: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT"])
     allow_headers: List[str] = Field(default_factory=lambda: ["*"])
     admin_api_key: str = Field(default="")
+    web_username: str = Field(default="")
+    web_password: str = Field(default="")
+    trusted_hosts: List[str] = Field(
+        default_factory=lambda: os.getenv(
+            "PBS_EXPLORER_SERVER_TRUSTED_HOSTS", "127.0.0.1,localhost,::1,testserver"
+        ).split(",")
+    )
+    enable_docs: bool = Field(default=False)
+    enable_psd: bool = Field(default=True)
 
 
 class LoggingSettings(BaseModel):
@@ -123,6 +132,11 @@ def get_settings() -> Settings:
     settings.server.allow_methods = _get_list("SERVER_ALLOW_METHODS", settings.server.allow_methods)
     settings.server.allow_headers = _get_list("SERVER_ALLOW_HEADERS", settings.server.allow_headers)
     settings.server.admin_api_key = _get_env("ADMIN_API_KEY", settings.server.admin_api_key) or ""
+    settings.server.web_username = _get_env("WEB_USERNAME", settings.server.web_username) or ""
+    settings.server.web_password = _get_env("WEB_PASSWORD", settings.server.web_password) or ""
+    settings.server.trusted_hosts = _get_list("SERVER_TRUSTED_HOSTS", settings.server.trusted_hosts)
+    settings.server.enable_docs = _get_bool("SERVER_ENABLE_DOCS", settings.server.enable_docs)
+    settings.server.enable_psd = _get_bool("SERVER_ENABLE_PSD", settings.server.enable_psd)
 
     settings.logging.level = _get_env("LOG_LEVEL", settings.logging.level) or settings.logging.level
     settings.logging.format = _get_env("LOG_FORMAT", settings.logging.format) or settings.logging.format

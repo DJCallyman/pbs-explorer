@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import secrets
+from fastapi import Depends, HTTPException, Request, Security, status
 from typing import Generator
-
-from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
@@ -18,13 +17,18 @@ def get_db() -> Generator[Session, None, None]:
         yield session
 
 
-def verify_admin(api_key: str | None = Security(_api_key_header)) -> str:
+def verify_admin(request: Request, api_key: str | None = Security(_api_key_header)) -> str:
     """Verify the admin API key from the ``X-Admin-API-Key`` header.
 
     Raises:
         HTTPException 401: If the key is missing.
         HTTPException 403: If the key does not match the configured value.
     """
+    web_auth_user = getattr(request.state, "web_auth_user", "")
+    web_auth_role = getattr(request.state, "web_auth_role", "")
+    if web_auth_user and web_auth_role == "admin":
+        return web_auth_user
+
     settings = get_settings()
     configured_key = settings.server.admin_api_key
     if not configured_key:

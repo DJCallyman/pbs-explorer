@@ -43,6 +43,15 @@ class SyncOrchestrator:
         self.request_delay_seconds = request_delay_seconds
         self.last_request_time = 0
 
+    async def aclose(self) -> None:
+        await self.client.aclose()
+        await self.incremental_sync.aclose()
+
+    def _mark_status_complete(self) -> None:
+        self.status.in_progress = False
+        self.status.last_success_at = datetime.now(timezone.utc)
+        self.status.current_endpoint = None
+
     async def _enforce_rate_limit(self) -> None:
         elapsed = time.time() - self.last_request_time
         if elapsed < self.request_delay_seconds:
@@ -224,11 +233,7 @@ class SyncOrchestrator:
 
         self.logger.info("=" * 80)
 
-        # Mark sync as complete
-        self.status.in_progress = False
-        self.status.last_success_at = datetime.now(timezone.utc)
-        self.status.current_endpoint = None
-
+        self._mark_status_complete()
         return results
 
     async def sync_endpoints(self, endpoints: list) -> Dict[str, int]:
@@ -297,11 +302,7 @@ class SyncOrchestrator:
         self.logger.info(f"Total time: {total_time:.1f}s")
         self.logger.info("=" * 80)
 
-        # Mark sync as complete
-        self.status.in_progress = False
-        self.status.last_success_at = datetime.now(timezone.utc)
-        self.status.current_endpoint = None
-
+        self._mark_status_complete()
         return results
 
     async def sync_all_incremental(self) -> Dict[str, int]:
@@ -426,11 +427,7 @@ class SyncOrchestrator:
         self.logger.info(f"Total time: {total_time:.1f}s")
         self.logger.info("=" * 80)
 
-        # Mark sync as complete
-        self.status.in_progress = False
-        self.status.last_success_at = datetime.now(timezone.utc)
-        self.status.current_endpoint = None
-
+        self._mark_status_complete()
         return results
 
     def _update_sync_state(
@@ -494,8 +491,19 @@ class SyncOrchestrator:
         # Get the global status from the store (not the local instance)
         global_status = status_store.get()
 
+        inferred_in_progress = global_status.in_progress if global_status else False
+        if (
+            global_status
+            and global_status.in_progress
+            and global_status.current_endpoint is None
+            and global_status.last_success_at
+            and global_status.last_run_at
+            and global_status.last_success_at >= global_status.last_run_at
+        ):
+            inferred_in_progress = False
+
         return {
-            "in_progress": global_status.in_progress if global_status else False,
+            "in_progress": inferred_in_progress,
             "current_endpoint": global_status.current_endpoint if global_status else None,
             "last_run_at": global_status.last_run_at.isoformat() if global_status and global_status.last_run_at else None,
             "last_success_at": global_status.last_success_at.isoformat() if global_status and global_status.last_success_at else None,

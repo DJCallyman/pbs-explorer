@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, Numeric, String, TIMESTAMP
+from sqlalchemy import Column, Numeric, String, TIMESTAMP
 
 from db.base import Base
 
@@ -8,8 +8,7 @@ from db.base import Base
 class Copayment(Base):
     __tablename__ = "copayment"
 
-    id = Column(Integer, primary_key=True)
-    schedule_code = Column(String(20))
+    schedule_code = Column(String(20), primary_key=True)
     general = Column(Numeric(10, 2))
     concessional = Column(Numeric(10, 2))
     safety_net_general = Column(Numeric(10, 2))

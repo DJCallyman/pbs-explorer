@@ -1,0 +1,66 @@
+<div class="history-card">
+  <div class="history-header">
+    <strong>{{ pbs_code }}</strong>
+    <span class="history-subtitle">
+      Schedule history{% if schedule_mode != "all" %} ({{ schedule_mode }}){% endif %}
+    </span>
+  </div>
+
+  {% if history_groups %}
+    {% for group in history_groups %}
+      <div class="history-group">
+        <div class="history-group-title">
+          <strong>{{ group.label }}</strong>
+        </div>
+        <table class="results-table history-table">
+          <thead>
+            <tr>
+              <th>Effective Date</th>
+              <th>Status</th>
+              <th>AEMP</th>
+              <th>Dispensing Rule</th>
+              <th>Dispensed Price</th>
+              <th>SPA</th>
+              <th>Schedule</th>
+              <th>PBS Program</th>
+              <th>Max Qty Packs</th>
+              <th>Max Qty Units</th>
+              <th>Formulary</th>
+              <th>Pricing Events</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in group.rows %}
+              <tr>
+                <td>{{ row.effective_date_display }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.aemp }}</td>
+                <td>{{ row.dispensing_rule or "-" }}</td>
+                <td>{{ row.dispensed_price }}</td>
+                <td>{{ row.spa_flag }}</td>
+                <td>{{ row.schedule_label }}</td>
+                <td>{{ row.pbs_program_label }}</td>
+                <td>{{ row.max_qty_packs }}</td>
+                <td>{{ row.max_qty_units }}</td>
+                <td>{{ row.formulary }}</td>
+                <td>
+                  {% if row.pricing_events %}
+                    <div class="change-list">
+                      {% for event in row.pricing_events %}
+                        <div class="change-chip">{{ event }}</div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <span class="muted">None</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="results-empty">No history found for this PBS code.</div>
+  {% endif %}
+</div>

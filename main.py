@@ -53,11 +53,11 @@ def _ensure_search_support_indexes() -> None:
 
 
 def _ensure_app_support_tables() -> None:
-    from db.session import init_engine, _engine  # type: ignore
+    import db.session as session_module
 
-    init_engine()
+    session_module.init_engine()
     Base.metadata.create_all(
-        bind=_engine,
+        bind=session_module._engine,
         tables=[
             MedicineStatusEntry.__table__,
             WebUser.__table__,

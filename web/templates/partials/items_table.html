@@ -1,34 +1,330 @@
-<table class="results-table">
-  <thead>
-    <tr>
-      <th>Drug Name</th>
-      <th>Brand</th>
-      <th>PBS Code</th>
-      <th>First Listed</th>
-      <th>Program</th>
-      <th>Benefit Type</th>
-      <th>Price</th>
-      <th>Max Amount</th>
-      <th>Prescribing Type</th>
-      <th>Indications</th>
-      <th>Severity</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for item in items %}
+<div class="results-shell">
+  <div class="results-toolbar">
+    <div>
+      <div class="results-count">{{ items|length }} grouped result{% if items|length != 1 %}s{% endif %}</div>
+      <div class="results-hint">Click any column title to sort ascending or descending. Dropdowns filter from the values already in these results.</div>
+    </div>
+  </div>
+
+  <div class="results-table-scroll">
+  <table class="results-table results-table-compact" data-enhanced="search-results" data-filter-row="true">
+    <colgroup>
+      <col class="col-select" />
+      <col class="col-toggle" />
+      <col class="col-drug" />
+      <col class="col-brand" />
+      <col class="col-code" />
+      <col class="col-indication" />
+      <col class="col-form" />
+      <col class="col-status" />
+      <col class="col-date" />
+      <col class="col-date" />
+      <col class="col-currency" />
+      <col class="col-currency" />
+      <col class="col-short" />
+      <col class="col-short" />
+      <col class="col-program" />
+      <col class="col-date" />
+      <col class="col-program" />
+      <col class="col-program" />
+      <col class="col-short" />
+      <col class="col-short" />
+      <col class="col-short" />
+      <col class="col-episodicity" />
+    </colgroup>
+    <thead>
       <tr>
-        <td>{{ item.drug_name }}</td>
-        <td>{{ item.brand_name }}</td>
-        <td>{{ item.pbs_code }}</td>
-        <td>{{ item.first_listed_date }}</td>
-        <td>{{ item.program_code }}</td>
-        <td>{{ item.benefit_type_code }}</td>
-        <td>{{ item.determined_price }}</td>
-        <td>{{ item.maximum_amount }}</td>
-        <td>{{ item.prescribing_type }}</td>
-        <td>{{ item.indications }}</td>
-        <td>{{ item.severity }}</td>
+        <th class="select-col">
+          <label class="select-all-label" title="Select or deselect all visible rows">
+            <input type="checkbox" class="report-select-all" />
+            <span>Rpt</span>
+          </label>
+        </th>
+        <th class="toggle-col">Hist</th>
+        <th><button type="button" class="sort-button" data-sort-key="drug_name" data-sort-type="text">Drug</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="brand_name" data-sort-type="text">Brand</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="pbs_code" data-sort-type="text">PBS Code</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="indications" data-sort-type="text">Indication</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="form_summary" data-sort-type="text">Form</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="status" data-sort-type="text">Status</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="first_listed_date" data-sort-type="date">First Listed</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="item_code_status" data-sort-type="text">Item Code Status</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="aemp" data-sort-type="number">AEMP</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="dispensed_price" data-sort-type="number">Dispensed</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="spa_flag" data-sort-type="text">SPA</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="schedule_label" data-sort-type="text">Schedule</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="pbs_program_label" data-sort-type="text">PBS Program</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="pbac_meeting_date" data-sort-type="date">PBAC Meeting</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="pbac_outcome_published" data-sort-type="text">PBAC Outcome</button></th>
+        <th>Public Summary</th>
+        <th><button type="button" class="sort-button" data-sort-key="max_qty_packs" data-sort-type="number">Max Packs</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="max_qty_units" data-sort-type="number">Max Units</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="formulary" data-sort-type="text">Formulary</button></th>
+        <th><button type="button" class="sort-button" data-sort-key="episodicity" data-sort-type="text">Episodicity</button></th>
       </tr>
-    {% endfor %}
-  </tbody>
-</table>
+      <tr class="filter-row">
+        <th></th>
+        <th></th>
+        <th>
+          <select class="column-filter" data-filter-key="drug_name">
+            <option value="">All</option>
+            {% for option in filter_options.drug_name %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="brand_name">
+            <option value="">All</option>
+            {% for option in filter_options.brand_name %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="pbs_code">
+            <option value="">All</option>
+            {% for option in filter_options.pbs_code %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="indications">
+            <option value="">All</option>
+            {% for option in filter_options.indications %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="form_summary">
+            <option value="">All</option>
+            {% for option in filter_options.form_summary %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="status">
+            <option value="">All</option>
+            {% for option in filter_options.status %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="first_listed_date_display">
+            <option value="">All</option>
+            {% for option in filter_options.first_listed_date_display %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="item_code_status">
+            <option value="">All</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            {% for option in filter_options.item_code_status if option not in ['Active', 'Inactive'] %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="aemp_filter_values" data-filter-match="contains">
+            <option value="">All</option>
+            {% for option in filter_options.aemp_filter_values %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="dispensed_price_display">
+            <option value="">All</option>
+            {% for option in filter_options.dispensed_price_display %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="spa_flag">
+            <option value="">All</option>
+            {% for option in filter_options.spa_flag %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="schedule_label">
+            <option value="">All</option>
+            {% for option in filter_options.schedule_label %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="pbs_program_label">
+            <option value="">All</option>
+            {% for option in filter_options.pbs_program_label %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="pbac_meeting_date_display">
+            <option value="">All</option>
+            {% for option in filter_options.pbac_meeting_date_display %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="pbac_outcome_published">
+            <option value="">All</option>
+            {% for option in filter_options.pbac_outcome_published %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th></th>
+        <th>
+          <select class="column-filter" data-filter-key="max_qty_packs">
+            <option value="">All</option>
+            {% for option in filter_options.max_qty_packs %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="max_qty_units">
+            <option value="">All</option>
+            {% for option in filter_options.max_qty_units %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="formulary">
+            <option value="">All</option>
+            {% for option in filter_options.formulary %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+        <th>
+          <select class="column-filter" data-filter-key="episodicity">
+            <option value="">All</option>
+            {% for option in filter_options.episodicity %}
+              <option value="{{ option }}">{{ option }}</option>
+            {% endfor %}
+          </select>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if items %}
+        {% for item in items %}
+          <tr
+            class="result-row"
+            data-drug-name="{{ item.drug_name }}"
+            data-brand-name="{{ item.brand_name }}"
+            data-pbs-code="{{ item.pbs_code }}"
+            data-indications="{{ item.indications }}"
+            data-form-summary="{{ item.form_summary }}"
+            data-status="{{ item.status }}"
+            data-first-listed-date="{{ item.first_listed_date }}"
+            data-first-listed-date-display="{{ item.first_listed_date_display }}"
+            data-last-seen-date="{{ item.last_seen_date }}"
+            data-last-seen-date-display="{{ item.last_seen_date_display }}"
+            data-item-code-status="{{ item.item_code_status }}"
+            data-aemp="{{ item.aemp }}"
+            data-aemp-display="{{ item.aemp_display }}"
+            data-aemp-filter-values="{{ item.aemp_filter_values|join(' | ') }}"
+            data-dispensed-price="{{ item.dispensed_price }}"
+            data-dispensed-price-display="{{ item.dispensed_price_display }}"
+            data-spa-flag="{{ item.spa_flag }}"
+            data-schedule-label="{{ item.schedule_label }}"
+            data-pbs-program-label="{{ item.pbs_program_label }}"
+            data-pbac-meeting-date="{{ item.pbac_meeting_date }}"
+            data-pbac-meeting-date-display="{{ item.pbac_meeting_date_display }}"
+            data-pbac-outcome-published="{{ item.pbac_outcome_published }}"
+            data-max-qty-packs="{{ item.max_qty_packs }}"
+            data-max-qty-units="{{ item.max_qty_units }}"
+            data-formulary="{{ item.formulary }}"
+            data-episodicity="{{ item.episodicity }}"
+            data-history-loaded="false"
+          >
+            <td class="select-col">
+              <input
+                type="checkbox"
+                class="report-select-checkbox"
+                aria-label="Include {{ item.pbs_code }} in Medicare Statistics report"
+                checked
+              />
+            </td>
+            <td class="toggle-col">
+              <button
+                type="button"
+                class="history-toggle"
+                aria-expanded="false"
+                title="Open history"
+                data-target="history-{{ item.pbs_code }}"
+                data-url="/web/items/{{ item.pbs_code }}/history?schedule_mode={{ schedule_mode }}"
+              >
+                +
+              </button>
+            </td>
+            <td class="wrap-cell">{{ item.drug_name }}</td>
+            <td class="wrap-cell">{{ item.brand_name }}</td>
+            <td class="nowrap-cell"><span class="code-pill">{{ item.pbs_code }}</span></td>
+            <td class="wrap-cell">{{ item.indications }}</td>
+            <td class="wrap-cell">{{ item.form_summary }}</td>
+            <td class="nowrap-cell"><span class="status-pill status-pill-{{ item.status|lower }}">{{ item.status }}</span></td>
+            <td class="nowrap-cell">{{ item.first_listed_date_display }}</td>
+            <td class="status-detail-cell">
+              <span class="code-status-chip code-status-chip-{{ item.item_code_status|lower }}">{{ item.item_code_status }}</span>
+              {% if item.item_code_status == "Inactive" %}
+                <span class="status-subtext">{{ item.last_seen_date_display }}</span>
+              {% endif %}
+            </td>
+            <td class="nowrap-cell">{{ item.aemp_display }}</td>
+            <td class="nowrap-cell">{{ item.dispensed_price_display }}</td>
+            <td class="nowrap-cell">{{ item.spa_flag }}</td>
+            <td class="nowrap-cell">{{ item.schedule_label }}</td>
+            <td class="wrap-cell">{{ item.pbs_program_label }}</td>
+            <td class="nowrap-cell">{{ item.pbac_meeting_date_display }}</td>
+            <td class="wrap-cell">
+              {% if item.pbac_outcome_link %}
+                <a href="{{ item.pbac_outcome_link }}" target="_blank" rel="noopener noreferrer">{{ item.pbac_outcome_published or "View outcome" }}</a>
+              {% else %}
+                {{ item.pbac_outcome_published }}
+              {% endif %}
+            </td>
+            <td class="wrap-cell">
+              {% if item.public_summary_url %}
+                <a href="{{ item.public_summary_url }}" target="_blank" rel="noopener noreferrer">{{ item.public_summary_title or "Open PSD" }}</a>
+              {% elif item.medicine_status_url %}
+                <a href="{{ item.medicine_status_url }}" target="_blank" rel="noopener noreferrer">Medicine Status</a>
+              {% endif %}
+            </td>
+            <td class="nowrap-cell">{{ item.max_qty_packs }}</td>
+            <td class="nowrap-cell">{{ item.max_qty_units }}</td>
+            <td class="nowrap-cell">{{ item.formulary }}</td>
+            <td class="wrap-cell">{{ item.episodicity }}</td>
+          </tr>
+          <tr class="history-row is-hidden">
+            <td colspan="22">
+              <div id="history-{{ item.pbs_code }}" class="history-panel"></div>
+            </td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="22">No results found.</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  </div>
+</div>

@@ -12,5 +12,5 @@ class ATCCode(Base):
     atc_description = Column(String(500))
     atc_level = Column(Integer)
     atc_parent_code = Column(String(20))
-    schedule_code = Column(String(20))
+    schedule_code = Column(String(20), primary_key=True)
     created_at = Column(TIMESTAMP)

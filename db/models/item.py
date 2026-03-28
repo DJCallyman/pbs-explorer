@@ -16,7 +16,7 @@ class Item(Base):
     )
 
     li_item_id = Column(String(100), primary_key=True)
-    schedule_code = Column(String(20))
+    schedule_code = Column(String(20), primary_key=True)
     drug_name = Column(String(500))
     li_drug_name = Column(String(500))
     li_form = Column(String(500))

@@ -24,9 +24,9 @@ def upgrade() -> None:
     sa.Column('atc_description', sa.String(length=500), nullable=True),
     sa.Column('atc_level', sa.Integer(), nullable=True),
     sa.Column('atc_parent_code', sa.String(length=20), nullable=True),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('atc_code')
+    sa.PrimaryKeyConstraint('atc_code', 'schedule_code')
     )
     op.create_table('base_reference',
     sa.Column('id', sa.String(length=200), nullable=False),
@@ -37,8 +37,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('copayment',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
     sa.Column('general', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('concessional', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('safety_net_general', sa.Numeric(precision=10, scale=2), nullable=True),
@@ -47,12 +46,11 @@ def upgrade() -> None:
     sa.Column('increased_discount_limit', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('safety_net_ctg_contribution', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('schedule_code')
     )
     op.create_table('fee',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
-    sa.Column('program_code', sa.String(length=10), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
+    sa.Column('program_code', sa.String(length=10), nullable=False),
     sa.Column('dispensing_fee_ready_prepared', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('dispensing_fee_dangerous_drug', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('dispensing_fee_extra', sa.Numeric(precision=10, scale=2), nullable=True),
@@ -72,20 +70,20 @@ def upgrade() -> None:
     sa.Column('acss_imdq60_payment', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('acss_payment', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('schedule_code', 'program_code')
     )
     op.create_table('indication',
     sa.Column('indication_prescribing_txt_id', sa.Integer(), nullable=False),
     sa.Column('condition', sa.String(length=500), nullable=True),
     sa.Column('episodicity', sa.String(length=100), nullable=True),
     sa.Column('severity', sa.String(length=100), nullable=True),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('indication_prescribing_txt_id')
+    sa.PrimaryKeyConstraint('indication_prescribing_txt_id', 'schedule_code')
     )
     op.create_table('item',
     sa.Column('li_item_id', sa.String(length=100), nullable=False),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
     sa.Column('drug_name', sa.String(length=500), nullable=True),
     sa.Column('li_drug_name', sa.String(length=500), nullable=True),
     sa.Column('li_form', sa.String(length=500), nullable=True),
@@ -160,7 +158,7 @@ def upgrade() -> None:
     sa.Column('innovator_indicator', sa.String(length=1), nullable=True),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
     sa.Column('updated_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('li_item_id')
+    sa.PrimaryKeyConstraint('li_item_id', 'schedule_code')
     )
     op.create_table('item_atc_relationship',
     sa.Column('li_item_id', sa.String(length=100), nullable=False),
@@ -208,7 +206,7 @@ def upgrade() -> None:
     )
     op.create_table('restriction',
     sa.Column('res_code', sa.String(length=100), nullable=False),
-    sa.Column('schedule_code', sa.String(length=20), nullable=True),
+    sa.Column('schedule_code', sa.String(length=20), nullable=False),
     sa.Column('restriction_number', sa.Integer(), nullable=True),
     sa.Column('treatment_of_code', sa.Integer(), nullable=True),
     sa.Column('authority_method', sa.String(length=50), nullable=True),
@@ -223,7 +221,7 @@ def upgrade() -> None:
     sa.Column('written_authority_required', sa.String(length=1), nullable=True),
     sa.Column('created_at', sa.TIMESTAMP(), nullable=True),
     sa.Column('updated_at', sa.TIMESTAMP(), nullable=True),
-    sa.PrimaryKeyConstraint('res_code')
+    sa.PrimaryKeyConstraint('res_code', 'schedule_code')
     )
     op.create_table('schedule',
     sa.Column('schedule_code', sa.String(length=20), nullable=False),

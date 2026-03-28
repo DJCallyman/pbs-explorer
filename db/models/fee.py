@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, Integer, Numeric, String, TIMESTAMP
+from sqlalchemy import Column, Numeric, String, TIMESTAMP
 
 from db.base import Base
 
@@ -8,9 +8,8 @@ from db.base import Base
 class Fee(Base):
     __tablename__ = "fee"
 
-    id = Column(Integer, primary_key=True)
-    schedule_code = Column(String(20))
-    program_code = Column(String(10))
+    schedule_code = Column(String(20), primary_key=True)
+    program_code = Column(String(10), primary_key=True)
     dispensing_fee_ready_prepared = Column(Numeric(10, 2))
     dispensing_fee_dangerous_drug = Column(Numeric(10, 2))
     dispensing_fee_extra = Column(Numeric(10, 2))

@@ -52,6 +52,7 @@ pbs_data.db
 # Logs
 *.log
 app.log
+.run/
 
 # Debug files
 debug_summary_changes.py
@@ -59,6 +60,15 @@ summary_changes_debug.csv
 
 # Backup
 backup/
+
+# App-generated data
+data/auth/
+data/saved_reports/
+data/pbs_documents/
+
+# Local AI/chat handoff artifacts
+chatgpt-share-*.md
+CONTINUE_FROM_CHATGPT_SHARE.md
 
 
 # VSCode

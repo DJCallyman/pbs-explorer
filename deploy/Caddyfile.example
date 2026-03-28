@@ -1,0 +1,18 @@
+your-domain.example.com {
+    encode gzip
+
+    header {
+        -Server
+    }
+
+    reverse_proxy 127.0.0.1:8000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-For {remote_host}
+    }
+
+    log {
+        output file /usr/local/var/log/caddy/pbs-explorer-access.log
+        format console
+    }
+}

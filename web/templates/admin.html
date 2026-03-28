@@ -1,474 +1,801 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section>
-  <h2>Admin Dashboard</h2>
-
-  <div class="admin-card">
-    <h3>Schedule Status</h3>
-    <div id="schedule-status" 
-         hx-get="/api/v1/admin/sync/schedules" 
-         hx-trigger="load, every 60s"
-         class="json-target"
-         data-type="schedules">
-      <p class="loading">Loading...</p>
+<section class="search-page" data-admin-section="{{ admin_section or 'sync' }}">
+  <div class="page-hero">
+    <div>
+      <div class="eyebrow">Admin</div>
+      <h2>System Maintenance</h2>
     </div>
   </div>
 
-  <div class="admin-card">
-    <h3>Sync Estimate</h3>
-    <div id="sync-estimate" 
-         hx-get="/api/v1/admin/sync/estimate" 
-         hx-trigger="load"
-         class="json-target"
-         data-type="estimate">
-      <p class="loading">Calculating...</p>
-    </div>
-  </div>
+  <nav class="admin-subnav" aria-label="Admin sections">
+    <a href="/admin/sync" class="admin-subnav-link {% if (admin_section or 'sync') == 'sync' %}is-active{% endif %}">Sync</a>
+    <a href="/admin/users" class="admin-subnav-link {% if admin_section == 'users' %}is-active{% endif %}">User Management</a>
+  </nav>
 
-  <div class="admin-card">
-    <h3>Sync Operations</h3>
-    <div class="sync-actions">
-      <div class="sync-action">
-        <h4>Full Sync</h4>
-        <p>Syncs all 34 endpoints with complete data. Use when first setting up or after extended period without sync.</p>
-        <button class="btn-primary" onclick="runFullSync()">
-          Run Full Sync
-        </button>
-      </div>
+  {% if (admin_section or 'sync') == 'sync' %}
+    <div class="admin-grid">
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h3>PBS Data & Schedule</h3>
+            <p class="admin-card-intro">PBS API sync controls and automatic schedule detection.</p>
+          </div>
+        </div>
+        <div class="admin-button-row">
+          <button type="button" class="btn btn-secondary" onclick="runIncrementalSync()">Run Incremental Sync</button>
+          <button type="button" class="btn btn-secondary" onclick="runFullSync()">Run Full Sync</button>
+        </div>
+        <div id="sync-result"></div>
+        <div id="pbs-sync-status" class="admin-status-grid">
+          <p class="muted">Loading PBS status...</p>
+        </div>
+      </section>
 
-      <div class="sync-action">
-        <h4>Incremental Sync</h4>
-        <p>Syncs only changes since last sync using the summary-of-changes endpoint. Much faster than full sync.</p>
-        <button class="btn-secondary" onclick="runIncrementalSync()">
-          Run Incremental Sync
-        </button>
-      </div>
-    </div>
-    <div id="sync-result"></div>
-  </div>
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h3>Medicines Status</h3>
+            <p class="admin-card-intro">PBAC and Medicines Status metadata refreshes.</p>
+          </div>
+        </div>
+        <div class="admin-button-row">
+          <button type="button" class="btn btn-secondary" onclick="runMedicineStatusSync()">Refresh Medicines Status</button>
+        </div>
+        <div id="medicine-status-sync-result"></div>
+        <div id="medicine-status-panel" class="admin-status-grid">
+          <p class="muted">Loading Medicines Status...</p>
+        </div>
+      </section>
 
-  <div class="admin-card">
-    <h3>Sync Specific Endpoints</h3>
-    <div id="endpoints-list"
-         hx-get="/api/v1/admin/sync/endpoints"
-         hx-trigger="load"
-         class="json-target"
-         data-type="endpoints">
-      <p class="loading">Loading endpoints...</p>
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h3>Medicare Updates</h3>
+            <p class="admin-card-intro">Monitor the latest Services Australia monthly data availability.</p>
+          </div>
+        </div>
+        <div class="admin-button-row">
+          <button type="button" class="btn btn-secondary" onclick="runLatestMedicareCheck()">Check Latest Medicare Month</button>
+        </div>
+        <div id="medicare-status-result"></div>
+        <div id="medicare-status-panel" class="admin-status-grid">
+          <p class="muted">Loading Medicare status...</p>
+        </div>
+      </section>
     </div>
-    <div id="endpoint-sync-result"></div>
-  </div>
+  {% else %}
+    <div class="admin-grid">
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h3>User Accounts</h3>
+            <p class="admin-card-intro">Manage browser logins and role assignments.</p>
+          </div>
+        </div>
 
-  <div class="admin-card">
-    <h3>Sync Status</h3>
-    <div id="sync-status" 
-         hx-get="/api/v1/admin/sync/status" 
-         hx-trigger="load, every 10s"
-         class="json-target"
-         data-type="status">
-      <p class="loading">Loading...</p>
-    </div>
-  </div>
+        <div class="admin-action-card">
+          <h4>Create User</h4>
+          <p>Create browser login accounts for non-admin users or additional admins.</p>
+          <p class="muted">Passwords are stored securely and cannot be viewed later. After confirming another admin works, you can retire the bootstrap `.env` admin credentials.</p>
+          <div class="admin-form-grid">
+            <label class="field">
+              <span>User ID</span>
+              <input type="text" id="user-create-username" placeholder="e.g. analyst01" />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input type="password" id="user-create-password" placeholder="At least 10 characters" />
+            </label>
+            <label class="field field-checkbox">
+              <span>Password display</span>
+              <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('user-create-password', this)">Show password</button>
+            </label>
+            <label class="field">
+              <span>Role</span>
+              <select id="user-create-role">
+                <option value="user" selected>User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="createManagedUser()">Create User</button>
+          <div id="user-create-result"></div>
+        </div>
 
-  <div class="admin-card">
-    <h3>Sync History</h3>
-    <div id="sync-history" 
-         hx-get="/api/v1/admin/sync/history" 
-         hx-trigger="load, every 30s"
-         class="json-target"
-         data-type="history">
-      <p class="loading">Loading...</p>
-    </div>
-  </div>
+        <div id="managed-users-panel" class="managed-users-panel">
+          {% if managed_users %}
+            {% for user in managed_users %}
+              <article class="managed-user-card" data-user="{{ user.username }}">
+                <div class="managed-user-summary">
+                  <div class="managed-user-name">{{ user.username }}</div>
+                  <div class="managed-user-meta">{{ user.role|title }}{% if user.updated_at %} | Updated {{ user.updated_at[:10] }}{% endif %}</div>
+                </div>
+                <div class="managed-user-actions">
+                  <input type="password" id="password-{{ loop.index }}" placeholder="New password" />
+                  <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('password-{{ loop.index }}', this)">Show password</button>
+                  <button type="button" class="btn btn-secondary" onclick="resetManagedUserPassword('{{ user.username }}', 'password-{{ loop.index }}')">Reset Password</button>
+                  <button type="button" class="btn btn-danger" onclick="deleteManagedUser('{{ user.username }}')">Delete</button>
+                </div>
+              </article>
+            {% endfor %}
+          {% else %}
+            <p class="muted" id="managed-users-empty">No managed users created yet.</p>
+          {% endif %}
+        </div>
+      </section>
 
-  <div class="admin-card">
-    <h3>Medicare Statistics End Date</h3>
-    <p style="color: #6c757d; font-size: 0.85rem; margin-bottom: 1rem;">
-      The latest YYYYMM for which PBS data is available on Medicare Statistics.
-      Update this when new months are published.
-    </p>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input type="text" id="medicare-end-date" placeholder="YYYYMM" maxlength="6"
-             style="padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; width: 120px; font-size: 1rem;" />
-      <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem;" onclick="saveMedicareEndDate()">Save</button>
+      <section class="admin-card">
+        <div class="admin-card-header">
+          <div>
+            <h3>Active Sessions</h3>
+            <p class="admin-card-intro">Grouped by user so old browser sessions do not clutter the page.</p>
+          </div>
+        </div>
+        <div id="active-sessions-panel" class="managed-users-panel">
+          <p class="muted">Loading active sessions...</p>
+        </div>
+      </section>
     </div>
-    <div id="medicare-end-date-result" style="margin-top: 0.5rem;"></div>
-  </div>
+  {% endif %}
 </section>
 
 <script>
+const adminSection = document.querySelector('[data-admin-section]')?.dataset.adminSection || 'sync';
+
+function formatIsoDate(value) {
+  if (!value) {
+    return "Unknown";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = date.toLocaleString('en-AU', { month: 'short' });
+  const year = date.getFullYear();
+  const timeBits = [date.getHours(), date.getMinutes(), date.getSeconds()];
+  const hasTime = timeBits.some(function (part) { return part !== 0; });
+  if (!hasTime) {
+    return `${day}-${month}-${year}`;
+  }
+  const time = date.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+  return `${day}-${month}-${year} ${time}`;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function togglePasswordVisibility(inputId, button) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (button) button.textContent = 'Hide password';
+  } else {
+    input.type = 'password';
+    if (button) button.textContent = 'Show password';
+  }
+}
+
+function showAdminMessage(targetId, message, kind) {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.innerHTML = `<div class="${kind === 'error' ? 'error-box' : kind === 'success' ? 'success-box' : 'warning-box'}">${message}</div>`;
+}
+
+function renderStatusTile(label, value, tone) {
+  const toneClass = tone ? ` ${tone}` : '';
+  return `<div class="status-item"><span class="label">${label}</span><span class="value${toneClass}">${escapeHtml(value || 'Unknown')}</span></div>`;
+}
+
+function indexJobs(jobs) {
+  const indexed = {};
+  (jobs || []).forEach(function (job) {
+    indexed[job.name] = job;
+  });
+  return indexed;
+}
+
+function pickNextRun(jobs) {
+  const valid = jobs.filter(function (job) {
+    return job && job.next_run_at;
+  });
+  if (!valid.length) {
+    return 'On demand';
+  }
+  valid.sort(function (a, b) {
+    return String(a.next_run_at).localeCompare(String(b.next_run_at));
+  });
+  return formatIsoDate(valid[0].next_run_at);
+}
+
+function renderSourceStatus(targetId, summary) {
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  target.innerHTML = `
+    ${summary.schedule ? `<p class="admin-schedule-note">${escapeHtml(summary.schedule)}</p>` : ''}
+    <div class="admin-status-row">
+      ${renderStatusTile('Current state', summary.currentState, summary.currentTone)}
+      ${renderStatusTile('Last outcome', summary.lastOutcome, summary.outcomeTone)}
+      ${renderStatusTile('Last activity', summary.lastActivity)}
+      ${renderStatusTile('Next automatic run', summary.nextRun, summary.nextTone)}
+    </div>
+  `;
+}
+
+async function loadSyncPanels() {
+  const pbsTarget = document.getElementById('pbs-sync-status');
+  const medicineTarget = document.getElementById('medicine-status-panel');
+  const medicareTarget = document.getElementById('medicare-status-panel');
+
+  try {
+    const [syncResponse, pbsScheduleResponse, medicareResponse, schedulerResponse] = await Promise.all([
+      fetch('/api/v1/admin/sync/status'),
+      fetch('/api/v1/admin/settings/pbs-schedule-status'),
+      fetch('/api/v1/admin/settings/medicare-status'),
+      fetch('/api/v1/admin/scheduler/status'),
+    ]);
+
+    const syncData = await syncResponse.json();
+    const pbsScheduleData = await pbsScheduleResponse.json();
+    const medicareData = await medicareResponse.json();
+    const schedulerData = await schedulerResponse.json();
+
+    if (!syncResponse.ok) throw new Error(syncData.detail || 'Could not load sync status.');
+    if (!pbsScheduleResponse.ok) throw new Error(pbsScheduleData.detail || 'Could not load PBS status.');
+    if (!medicareResponse.ok) throw new Error(medicareData.detail || 'Could not load Medicare status.');
+    if (!schedulerResponse.ok) throw new Error(schedulerData.detail || 'Could not load scheduler status.');
+
+    const jobs = indexJobs(schedulerData.jobs || []);
+    const pbsRunning = syncData.in_progress && String(syncData.current_endpoint || '').toLowerCase().includes('pbs');
+    const medicineRunning = syncData.in_progress && String(syncData.current_endpoint || '').toLowerCase().includes('medicine');
+    const medicareRunning = Boolean(jobs.medicare_latest_month_check && jobs.medicare_latest_month_check.is_running);
+
+    renderSourceStatus('pbs-sync-status', {
+      schedule: jobs.pbs_schedule_check ? jobs.pbs_schedule_check.summary : '',
+      currentState: pbsRunning ? 'PBS sync running' : (pbsScheduleData.new_schedule_available ? 'New schedule available' : 'Idle'),
+      currentTone: pbsRunning || pbsScheduleData.new_schedule_available ? 'warning' : 'success',
+      lastOutcome: pbsScheduleData.last_check_status || 'No PBS schedule check yet',
+      outcomeTone: pbsScheduleData.new_schedule_available ? 'warning' : '',
+      lastActivity: syncData.last_sync ? formatIsoDate(syncData.last_sync.at) : (pbsScheduleData.last_checked_at || 'Never'),
+      nextRun: pickNextRun([jobs.pbs_schedule_check]),
+      nextTone: jobs.pbs_schedule_check && jobs.pbs_schedule_check.is_running ? 'warning' : '',
+    });
+
+    renderSourceStatus('medicine-status-panel', {
+      schedule: [
+        jobs.medicine_status_monthly_refresh ? jobs.medicine_status_monthly_refresh.summary : '',
+        jobs.medicine_status_stale_fallback ? jobs.medicine_status_stale_fallback.summary : '',
+      ].filter(Boolean).join(' Fallback: '),
+      currentState: medicineRunning ? 'Refresh running' : 'Idle',
+      currentTone: medicineRunning ? 'warning' : 'success',
+      lastOutcome: (jobs.medicine_status_monthly_refresh && jobs.medicine_status_monthly_refresh.last_result) || 'No Medicines Status refresh yet',
+      outcomeTone: '',
+      lastActivity: jobs.medicine_status_monthly_refresh && jobs.medicine_status_monthly_refresh.last_success_at
+        ? formatIsoDate(jobs.medicine_status_monthly_refresh.last_success_at)
+        : 'Never',
+      nextRun: pickNextRun([jobs.medicine_status_monthly_refresh, jobs.medicine_status_stale_fallback]),
+      nextTone: jobs.medicine_status_monthly_refresh && jobs.medicine_status_monthly_refresh.is_running ? 'warning' : '',
+    });
+
+    renderSourceStatus('medicare-status-panel', {
+      schedule: jobs.medicare_latest_month_check ? jobs.medicare_latest_month_check.summary : '',
+      currentState: medicareRunning ? 'Check running' : 'Idle',
+      currentTone: medicareRunning ? 'warning' : 'success',
+      lastOutcome: medicareData.last_check_status || 'No Medicare check yet',
+      outcomeTone: 'success',
+      lastActivity: medicareData.last_checked_at || 'Never',
+      nextRun: pickNextRun([jobs.medicare_latest_month_check]),
+      nextTone: jobs.medicare_latest_month_check && jobs.medicare_latest_month_check.is_running ? 'warning' : '',
+    });
+  } catch (error) {
+    const message = `<div class="error-box">Could not load Admin sync status: ${escapeHtml(error.message)}</div>`;
+    if (pbsTarget) pbsTarget.innerHTML = message;
+    if (medicineTarget) medicineTarget.innerHTML = message;
+    if (medicareTarget) medicareTarget.innerHTML = message;
+  }
+}
+
+function renderManagedUsers(users) {
+  const panel = document.getElementById('managed-users-panel');
+  if (!panel) return;
+
+  if (!users || !users.length) {
+    panel.innerHTML = '<p class="muted" id="managed-users-empty">No managed users created yet.</p>';
+    return;
+  }
+
+  panel.innerHTML = users.map(function (user, index) {
+    const passwordInputId = `managed-user-password-${index}`;
+    const updated = user.updated_at ? ` | Updated ${escapeHtml(String(user.updated_at).slice(0, 10))}` : '';
+    return `
+      <article class="managed-user-card" data-user="${escapeHtml(user.username)}">
+        <div class="managed-user-summary">
+          <div class="managed-user-name">${escapeHtml(user.username)}</div>
+          <div class="managed-user-meta">${escapeHtml((user.role || 'user').charAt(0).toUpperCase() + (user.role || 'user').slice(1))}${updated} | Active sessions ${Number(user.active_sessions || 0)}</div>
+        </div>
+        <div class="managed-user-actions">
+          <input type="password" id="${passwordInputId}" placeholder="New password" />
+          <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('${passwordInputId}', this)">Show password</button>
+          <button type="button" class="btn btn-secondary" onclick="resetManagedUserPassword('${escapeHtml(user.username)}', '${passwordInputId}')">Reset Password</button>
+          <button type="button" class="btn btn-secondary" onclick="revokeUserSessions('${escapeHtml(user.username)}')">Sign Out Sessions</button>
+          <button type="button" class="btn btn-danger" onclick="deleteManagedUser('${escapeHtml(user.username)}')">Delete</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function renderActiveSessions(sessions) {
+  const panel = document.getElementById('active-sessions-panel');
+  if (!panel) return;
+  if (!sessions || !sessions.length) {
+    panel.innerHTML = '<p class="muted">No active browser sessions.</p>';
+    return;
+  }
+
+  const grouped = {};
+  sessions.forEach(function (session) {
+    const key = session.username;
+    if (!grouped[key]) {
+      grouped[key] = {
+        username: session.username,
+        role: session.role || 'user',
+        count: 0,
+        lastSeenAt: session.last_seen_at || '',
+        expiresAt: session.expires_at || '',
+      };
+    }
+    grouped[key].count += 1;
+    if ((session.last_seen_at || '') > grouped[key].lastSeenAt) grouped[key].lastSeenAt = session.last_seen_at || '';
+    if ((session.expires_at || '') > grouped[key].expiresAt) grouped[key].expiresAt = session.expires_at || '';
+  });
+
+  panel.innerHTML = Object.values(grouped).sort(function (a, b) {
+    return a.username.localeCompare(b.username);
+  }).map(function (entry) {
+    const sessionLabel = `${Number(entry.count).toLocaleString()} active session${entry.count === 1 ? '' : 's'}`;
+    return `
+      <article class="managed-user-card">
+        <div class="managed-user-summary">
+          <div class="managed-user-name">${escapeHtml(entry.username)}</div>
+          <div class="managed-user-meta">${escapeHtml((entry.role || 'user').charAt(0).toUpperCase() + (entry.role || 'user').slice(1))} | ${escapeHtml(sessionLabel)} | Last seen ${escapeHtml(formatIsoDate(entry.lastSeenAt))} | Latest expiry ${escapeHtml(formatIsoDate(entry.expiresAt))}</div>
+        </div>
+        <div class="managed-user-actions managed-user-actions-compact">
+          <button type="button" class="btn btn-secondary" onclick="revokeUserSessions('${escapeHtml(entry.username)}')">Sign Out All Sessions</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadManagedUsers() {
+  try {
+    const response = await fetch('/api/v1/admin/users');
+    const data = await response.json();
+    if (!response.ok) {
+      showAdminMessage('user-create-result', data.detail || 'Could not load users.', 'error');
+      return;
+    }
+    renderManagedUsers(data.users || []);
+  } catch (error) {
+    showAdminMessage('user-create-result', `Could not load users: ${error.message}`, 'error');
+  }
+}
+
+async function loadActiveSessions() {
+  try {
+    const response = await fetch('/api/v1/admin/sessions');
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Could not load active sessions.');
+    }
+    renderActiveSessions(data.sessions || []);
+  } catch (error) {
+    const panel = document.getElementById('active-sessions-panel');
+    if (panel) {
+      panel.innerHTML = `<div class="error-box">Could not load active sessions: ${escapeHtml(error.message)}</div>`;
+    }
+  }
+}
+
+async function createManagedUser() {
+  const username = document.getElementById('user-create-username').value.trim();
+  const password = document.getElementById('user-create-password').value;
+  const role = document.getElementById('user-create-role').value;
+
+  if (!username) {
+    showAdminMessage('user-create-result', 'User ID is required.', 'error');
+    return;
+  }
+  if (!password || password.length < 10) {
+    showAdminMessage('user-create-result', 'Password must be at least 10 characters.', 'error');
+    return;
+  }
+
+  showAdminMessage('user-create-result', 'Creating user...', 'warning');
+  try {
+    const response = await fetch('/api/v1/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, role }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      showAdminMessage('user-create-result', data.detail || 'Could not create user.', 'error');
+      return;
+    }
+    document.getElementById('user-create-username').value = '';
+    document.getElementById('user-create-password').value = '';
+    document.getElementById('user-create-role').value = 'user';
+    showAdminMessage('user-create-result', data.message || 'User created.', 'success');
+    loadManagedUsers();
+    loadActiveSessions();
+  } catch (error) {
+    showAdminMessage('user-create-result', `Could not create user: ${error.message}`, 'error');
+  }
+}
+
+async function resetManagedUserPassword(username, inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || !input.value || input.value.length < 10) {
+    window.alert('Enter a new password of at least 10 characters.');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/v1/admin/users/${encodeURIComponent(username)}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: input.value }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      window.alert(data.detail || 'Could not update password.');
+      return;
+    }
+    input.value = '';
+    window.alert(data.message || 'Password updated.');
+    loadManagedUsers();
+    loadActiveSessions();
+  } catch (error) {
+    window.alert(`Could not update password: ${error.message}`);
+  }
+}
+
+async function deleteManagedUser(username) {
+  if (!confirm(`Delete user ${username}?`)) return;
+  try {
+    const response = await fetch(`/api/v1/admin/users/${encodeURIComponent(username)}`, {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      window.alert(data.detail || 'Could not delete user.');
+      return;
+    }
+    window.alert(data.message || 'User deleted.');
+    loadManagedUsers();
+    loadActiveSessions();
+  } catch (error) {
+    window.alert(`Could not delete user: ${error.message}`);
+  }
+}
+
+async function revokeUserSessions(username) {
+  if (!confirm(`Sign out all active sessions for ${username}?`)) return;
+  try {
+    const response = await fetch(`/api/v1/admin/sessions/revoke-user/${encodeURIComponent(username)}`, {
+      method: 'POST',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      window.alert(data.detail || 'Could not sign out sessions.');
+      return;
+    }
+    window.alert(data.message || 'Sessions signed out.');
+    loadManagedUsers();
+    loadActiveSessions();
+  } catch (error) {
+    window.alert(`Could not sign out sessions: ${error.message}`);
+  }
+}
+
 async function runFullSync() {
-  if (!confirm('This will run a full sync of all data from the PBS API. This may take 5-10 minutes. Continue?')) return;
-  document.getElementById('sync-result').innerHTML = '<div class="loading">Running full sync...</div>';
+  if (!confirm('This will run a full sync of the PBS dataset only. It may take several minutes. Continue?')) return;
+  showAdminMessage('sync-result', 'Running full PBS sync...', 'warning');
   try {
     const response = await fetch('/api/v1/admin/sync/full', { method: 'POST' });
     const data = await response.json();
-    document.getElementById('sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
-    refreshAll();
-  } catch (e) {
-    document.getElementById('sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+    if (!response.ok) {
+      showAdminMessage('sync-result', data.detail || 'Full sync failed to start.', 'error');
+      return;
+    }
+    showAdminMessage('sync-result', data.message || 'Full sync started.', 'success');
+    loadSyncPanels();
+  } catch (error) {
+    showAdminMessage('sync-result', `Full sync failed: ${error.message}`, 'error');
   }
 }
 
 async function runIncrementalSync() {
-  if (!confirm('This will run an incremental sync to fetch only changes. Continue?')) return;
-  document.getElementById('sync-result').innerHTML = '<div class="loading">Running incremental sync...</div>';
+  if (!confirm('This will run an incremental PBS sync only. Continue?')) return;
+  showAdminMessage('sync-result', 'Running incremental PBS sync...', 'warning');
   try {
     const response = await fetch('/api/v1/admin/sync/incremental', { method: 'POST' });
     const data = await response.json();
-    document.getElementById('sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
-    refreshAll();
-  } catch (e) {
-    document.getElementById('sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
-  }
-}
-
-let availableEndpoints = [];
-
-async function runSelectedEndpoints() {
-  const checkboxes = document.querySelectorAll('.endpoint-checkbox:checked');
-  const selected = Array.from(checkboxes).map(cb => cb.value);
-  if (selected.length === 0) {
-    document.getElementById('endpoint-sync-result').innerHTML = '<div class="warning">Please select at least one endpoint.</div>';
-    return;
-  }
-  if (!confirm('This will sync ' + selected.length + ' endpoint(s). Continue?')) return;
-  document.getElementById('endpoint-sync-result').innerHTML = '<div class="loading">Running endpoint sync...</div>';
-  try {
-    const response = await fetch('/api/v1/admin/sync/endpoints', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoints: selected })
-    });
-    const data = await response.json();
-    document.getElementById('endpoint-sync-result').innerHTML = '<div class="success">' + data.message + '</div>';
-    refreshAll();
-  } catch (e) {
-    document.getElementById('endpoint-sync-result').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
-  }
-}
-
-function selectAllEndpoints() {
-  document.querySelectorAll('.endpoint-checkbox').forEach(cb => cb.checked = true);
-}
-
-function deselectAllEndpoints() {
-  document.querySelectorAll('.endpoint-checkbox').forEach(cb => cb.checked = false);
-}
-
-function refreshAll() {
-  document.getElementById('schedule-status').dispatchEvent(new Event('htmx:refresh'));
-  document.getElementById('sync-estimate').dispatchEvent(new Event('htmx:refresh'));
-  document.getElementById('sync-status').dispatchEvent(new Event('htmx:refresh'));
-  document.getElementById('sync-history').dispatchEvent(new Event('htmx:refresh'));
-  document.getElementById('endpoints-list').dispatchEvent(new Event('htmx:refresh'));
-}
-
-// Medicare Statistics End Date setting
-(async function loadMedicareEndDate() {
-  try {
-    const resp = await fetch('/api/v1/admin/settings/medicare-end-date');
-    const data = await resp.json();
-    document.getElementById('medicare-end-date').value = data.end_date || '';
-  } catch (e) { /* ignore */ }
-})();
-
-async function saveMedicareEndDate() {
-  const input = document.getElementById('medicare-end-date');
-  const resultDiv = document.getElementById('medicare-end-date-result');
-  const value = input.value.trim();
-  if (!/^\d{6}$/.test(value)) {
-    resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">Please enter a valid YYYYMM value (e.g. 202511).</div>';
-    return;
-  }
-  try {
-    const resp = await fetch('/api/v1/admin/settings/medicare-end-date', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: value }),
-    });
-    if (!resp.ok) {
-      const err = await resp.json();
-      resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">' + (err.detail || 'Save failed') + '</div>';
+    if (!response.ok) {
+      showAdminMessage('sync-result', data.detail || 'Incremental sync failed to start.', 'error');
       return;
     }
-    resultDiv.innerHTML = '<div class="success" style="padding:0.5rem;">Saved: ' + value + '</div>';
-  } catch (e) {
-    resultDiv.innerHTML = '<div class="error" style="padding:0.5rem;">Error: ' + e.message + '</div>';
+    showAdminMessage('sync-result', data.message || 'Incremental sync started.', 'success');
+    loadSyncPanels();
+  } catch (error) {
+    showAdminMessage('sync-result', `Incremental sync failed: ${error.message}`, 'error');
   }
 }
 
-// Transform JSON to HTML after HTMX swap
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-  const target = evt.detail.target;
-  const content = target.textContent.trim();
-  
-  if (!target.classList.contains('json-target')) return;
-  if (!content.startsWith('{') && !content.startsWith('[')) return;
-  
+async function runMedicineStatusSync() {
+  if (!confirm('This will refresh Medicines Status / PBAC metadata only. Continue?')) return;
+  showAdminMessage('medicine-status-sync-result', 'Refreshing Medicines Status / PBAC metadata...', 'warning');
   try {
-    const data = JSON.parse(content);
-    const dataType = target.dataset.type;
-    let html = '';
-    
-    if (dataType === 'schedules') html = renderScheduleStatus(data);
-    else if (dataType === 'status') html = renderSyncStatus(data);
-    else if (dataType === 'history') html = renderSyncHistory(data);
-    else if (dataType === 'estimate') html = renderEstimate(data);
-    else if (dataType === 'endpoints') html = renderEndpoints(data);
-    
-    if (html) target.innerHTML = html;
-  } catch (e) {
-    // Keep original content on error
+    const response = await fetch('/api/v1/admin/sync/medicine-status', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      showAdminMessage('medicine-status-sync-result', data.detail || 'Medicines Status refresh failed to start.', 'error');
+      return;
+    }
+    showAdminMessage('medicine-status-sync-result', data.message || 'Medicines Status refresh started.', 'success');
+    loadSyncPanels();
+  } catch (error) {
+    showAdminMessage('medicine-status-sync-result', `Medicines Status refresh failed: ${error.message}`, 'error');
+  }
+}
+
+async function runLatestMedicareCheck() {
+  if (!confirm('This will check the latest available Medicare month now. Continue?')) return;
+  showAdminMessage('medicare-status-result', 'Checking latest Medicare month...', 'warning');
+  try {
+    const response = await fetch('/api/v1/admin/settings/medicare-check-latest', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      showAdminMessage('medicare-status-result', data.detail || 'Medicare check failed to start.', 'error');
+      return;
+    }
+    showAdminMessage('medicare-status-result', data.message || 'Medicare latest month checked.', 'success');
+    loadSyncPanels();
+  } catch (error) {
+    showAdminMessage('medicare-status-result', `Medicare check failed: ${error.message}`, 'error');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (adminSection === 'sync') {
+    loadSyncPanels();
+    window.setInterval(loadSyncPanels, 30000);
+  } else {
+    loadManagedUsers();
+    loadActiveSessions();
   }
 });
-
-function renderScheduleStatus(data) {
-  if (data.error) {
-    return '<div class="error"><strong>Error:</strong> ' + data.error + '<br><small>' + (data.detail || '') + '</small></div>';
-  }
-  
-  let html = '<div class="status-grid">';
-  html += '<div class="status-item"><span class="label">Latest API Schedule</span><span class="value">' + (data.latest_api_schedule || 'Unknown') + '</span></div>';
-  html += '<div class="status-item"><span class="label">Current DB Schedule</span><span class="value">' + (data.current_db_schedule || 'Unknown') + '</span></div>';
-  html += '<div class="status-item"><span class="label">Needs Sync</span><span class="value ' + (data.needs_sync ? 'warning' : 'success') + '">' + (data.needs_sync ? 'Yes' : 'No') + '</span></div>';
-  html += '</div>';
-  
-  if (data.schedules && data.schedules.length > 0) {
-    html += '<div class="schedules-list"><h4>Available Schedules</h4><ul>';
-    data.schedules.forEach(s => {
-      html += '<li>Schedule ' + s.schedule_code + ' (' + (s.effective_date || 'No date') + ')</li>';
-    });
-    html += '</ul></div>';
-  }
-  return html;
-}
-
-function renderSyncStatus(data) {
-  let html = '<div class="status-grid">';
-  html += '<div class="status-item"><span class="label">Status</span><span class="value ' + (data.in_progress ? 'warning' : 'success') + '">' + (data.in_progress ? 'In Progress' : 'Idle') + '</span></div>';
-  
-  if (data.current_endpoint) {
-    html += '<div class="status-item"><span class="label">Current Endpoint</span><span class="value">' + data.current_endpoint + '</span></div>';
-  }
-  if (data.last_run_at) {
-    html += '<div class="status-item"><span class="label">Last Run</span><span class="value">' + new Date(data.last_run_at).toLocaleString() + '</span></div>';
-  }
-  if (data.records_processed !== undefined) {
-    html += '<div class="status-item"><span class="label">Records Processed</span><span class="value">' + data.records_processed.toLocaleString() + '</span></div>';
-  }
-  if (data.last_error) {
-    html += '<div class="status-item full-width error"><span class="label">Last Error</span><span class="value error">' + data.last_error + '</span></div>';
-  }
-  if (data.last_sync) {
-    html += '<div class="status-item"><span class="label">Last Sync Type</span><span class="value">' + (data.last_sync.type || 'Unknown') + '</span></div>';
-    html += '<div class="status-item"><span class="label">Last Sync At</span><span class="value">' + (data.last_sync.at ? new Date(data.last_sync.at).toLocaleString() : 'Never') + '</span></div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-function renderSyncHistory(data) {
-  if (!data.history || data.history.length === 0) {
-    return '<p>No sync history available.</p>';
-  }
-  
-  let html = '<table><thead><tr><th>Endpoint</th><th>Type</th><th>Fetched</th><th>Synced</th><th>Schedule</th><th>When</th></tr></thead><tbody>';
-  data.history.forEach(row => {
-    html += '<tr>';
-    html += '<td>' + row.endpoint + '</td>';
-    html += '<td><span class="badge ' + (row.sync_type || '').replace('_', '-') + '">' + (row.sync_type || 'unknown') + '</span></td>';
-    html += '<td>' + (row.records_fetched || '0') + '</td>';
-    html += '<td>' + (row.records_synced || '0') + '</td>';
-    html += '<td>' + (row.schedule_code || '-') + '</td>';
-    html += '<td>' + (row.last_synced_at ? new Date(row.last_synced_at).toLocaleString() : 'Never') + '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  return html;
-}
-
-function renderEstimate(data) {
-  if (data.type === 'error') {
-    return '<div class="error"><strong>Error:</strong> ' + data.error + '<br><small>' + (data.message || '') + '</small></div>';
-  }
-  if (data.type === 'not_needed') {
-    return '<div class="success"><strong>Up to Date</strong><br>' + data.message + '</div>';
-  }
-  if (data.type === 'full_required') {
-    return '<div class="warning"><strong>Full Sync Required</strong><br>' + data.message + '<br><small>Estimated time: ' + (data.estimated_time || 'unknown') + '</small></div>';
-  }
-  
-  let html = '<div class="estimate">';
-  html += '<p><strong>Incremental Sync Available</strong><br>' + data.message + '</p>';
-  html += '<div class="estimate-stats">';
-  html += '<div class="stat"><span class="stat-value">' + (data.estimated_changes || '?') + '</span><span class="stat-label">Changes</span></div>';
-  html += '<div class="stat"><span class="stat-value">' + (data.estimated_time || '?') + '</span><span class="stat-label">Est. Time</span></div>';
-  html += '</div></div>';
-  return html;
-}
-
-function renderEndpoints(data) {
-  if (!data.endpoints || data.endpoints.length === 0) {
-    return '<p>No endpoints available.</p>';
-  }
-  
-  let html = '<div class="endpoint-actions">';
-  html += '<button class="btn-secondary" onclick="selectAllEndpoints()">Select All</button>';
-  html += '<button class="btn-secondary" onclick="deselectAllEndpoints()">Deselect All</button>';
-  html += '</div>';
-  html += '<div class="endpoint-grid">';
-  
-  const sorted = [...data.endpoints].sort();
-  sorted.forEach((endpoint, idx) => {
-    html += '<label class="endpoint-item">';
-    html += '<input type="checkbox" class="endpoint-checkbox" value="' + endpoint + '">';
-    html += '<span>' + endpoint + '</span>';
-    html += '</label>';
-  });
-  
-  html += '</div>';
-  html += '<button class="btn-primary" style="margin-top: 1rem;" onclick="runSelectedEndpoints()">';
-  html += 'Sync Selected Endpoints</button>';
-  return html;
-}
 </script>
 
 <style>
-  .admin-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .admin-card h3 {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    color: #333;
-    border-bottom: 2px solid #007bff;
-    padding-bottom: 0.5rem;
-  }
-
-  .loading { color: #6c757d; font-style: italic; }
-
-  .status-grid {
+  .admin-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .admin-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #dbe4ea;
+    border-radius: 16px;
+    padding: 1.1rem;
+  }
+
+  .admin-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-card-header h3 {
+    margin: 0;
+  }
+
+  .admin-card-intro {
+    margin: 0.25rem 0 0;
+    color: #475569;
+    line-height: 1.45;
+  }
+
+  .admin-subnav {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .admin-subnav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid #dbe4ea;
+    background: #ffffff;
+    color: #334155;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .admin-subnav-link.is-active {
+    background: #0f766e;
+    border-color: #0f766e;
+    color: #ffffff;
+  }
+
+  .admin-button-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .admin-status-grid {
+    margin-top: 0.9rem;
+  }
+
+  .admin-status-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
-  .status-item {
-    padding: 0.5rem 0.75rem;
-    background: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 50px;
+  .admin-schedule-note {
+    margin: 0 0 0.7rem;
+    color: #475569;
+    font-size: 0.92rem;
+    line-height: 1.45;
   }
 
-  .status-item .label {
-    display: block;
-    font-size: 0.7rem;
-    color: #6c757d;
-    margin-bottom: 0.15rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1.2;
-  }
-
-  .status-item .value {
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #333;
-    line-height: 1.2;
-  }
-
-  .status-item .value.success { color: #28a745; }
-  .status-item .value.warning { color: #f59e00; }
-  .status-item .value.error { color: #dc3545; }
-
-  .status-item.full-width { grid-column: 1 / -1; }
-
-  .error { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; }
-  .warning { background: #fff3cd; color: #856404; padding: 1rem; border-radius: 6px; }
-  .success { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; }
-
-  .sync-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-
-  .sync-action {
-    background: #fff;
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
+  .admin-action-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #f8fafc;
     padding: 1rem;
   }
 
-  .sync-action h4 { margin: 0 0 0.5rem 0; color: #495057; }
-  .sync-action p { color: #6c757d; font-size: 0.85rem; margin-bottom: 1rem; line-height: 1.4; }
-
-  .btn-primary {
-    background: #007bff; color: white; border: none; padding: 0.6rem 1.2rem;
-    border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-weight: 500; width: 100%;
+  .admin-action-card h4 {
+    margin: 0 0 0.45rem;
   }
-  .btn-primary:hover { background: #0056b3; }
 
-  .btn-secondary {
-    background: #28a745; color: white; border: none; padding: 0.6rem 1.2rem;
-    border-radius: 4px; cursor: pointer; font-size: 0.95rem; font-weight: 500; width: 100%;
+  .admin-action-card p {
+    margin: 0 0 0.85rem;
+    color: #475569;
+    line-height: 1.45;
   }
-  .btn-secondary:hover { background: #1e7e34; }
 
-  #sync-result { margin-top: 1rem; padding: 1rem; border-radius: 6px; }
-
-  table {
+  .admin-action-card .btn,
+  .admin-button-row .btn {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    background: white;
-    border-radius: 6px;
-    overflow: hidden;
   }
 
-  th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #e9ecef; }
-  th { background: #f8f9fa; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #f8f9fa; }
-
-  .badge {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    font-weight: 500;
+  .admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 0.85rem;
   }
 
-  .badge.full { background: #007bff; color: white; }
-  .badge.incremental { background: #28a745; color: white; }
-  .badge.incremental-fallback { background: #f59e00; color: white; }
+  .managed-users-panel {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
 
-  .estimate { padding: 1rem; background: #e7f3ff; border-radius: 6px; }
-  .estimate p { margin: 0 0 0.5rem 0; }
-  .estimate-stats { display: flex; gap: 2rem; margin-top: 0.5rem; }
-  .stat { text-align: center; }
-  .stat-value { display: block; font-size: 1.5rem; font-weight: 700; color: #007bff; }
-  .stat-label { font-size: 0.75rem; color: #6c757d; text-transform: uppercase; }
+  .managed-user-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #f8fafc;
+    padding: 0.9rem 1rem;
+    display: grid;
+    gap: 0.75rem;
+  }
 
-  .schedules-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dee2e6; }
-  .schedules-list h4 { margin: 0 0 0.5rem 0; font-size: 0.8rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
-  .schedules-list ul { margin: 0; padding-left: 1.5rem; font-size: 0.85rem; max-height: 120px; overflow-y: auto; }
-  .schedules-list li { margin-bottom: 0.25rem; }
+  .managed-user-summary {
+    display: grid;
+    gap: 0.2rem;
+  }
 
-  .endpoint-actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-  .endpoint-actions .btn-secondary { width: auto; padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-  .endpoint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; max-height: 300px; overflow-y: auto; padding: 0.5rem; background: #fff; border-radius: 6px; border: 1px solid #e9ecef; }
-  .endpoint-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem; cursor: pointer; }
-  .endpoint-item:hover { background: #f8f9fa; border-radius: 4px; }
-  .endpoint-item input { margin: 0; }
-  .endpoint-item span { font-size: 0.85rem; }
-  #endpoint-sync-result { margin-top: 1rem; }
+  .managed-user-name {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .managed-user-meta {
+    color: #475569;
+    font-size: 0.92rem;
+  }
+
+  .managed-user-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .managed-user-actions-compact {
+    grid-template-columns: auto;
+    justify-content: start;
+  }
+
+  .status-item {
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .status-item .value.success {
+    color: #047857;
+  }
+
+  .status-item .value.warning {
+    color: #b45309;
+  }
+
+  .status-item .value.error {
+    color: #b91c1c;
+  }
+
+  .success-box,
+  .warning-box,
+  .error-box {
+    margin-top: 0.85rem;
+  }
+
+  .success-box {
+    border: 1px solid #a7f3d0;
+    background: #ecfdf5;
+    color: #047857;
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .warning-box {
+    border: 1px solid #fed7aa;
+    background: #fff7ed;
+    color: #b45309;
+    border-radius: 10px;
+    padding: 0.8rem 0.9rem;
+  }
+
+  @media (max-width: 1100px) {
+    .admin-status-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 900px) {
+    .admin-form-grid,
+    .managed-user-actions,
+    .admin-status-row {
+      grid-template-columns: 1fr;
+    }
+
+    .admin-subnav {
+      flex-wrap: wrap;
+    }
+  }
 </style>
 {% endblock %}

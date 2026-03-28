@@ -16,5 +16,5 @@ class Indication(Base):
     condition = Column(String(500))
     episodicity = Column(String(100))
     severity = Column(String(100))
-    schedule_code = Column(String(20))
+    schedule_code = Column(String(20), primary_key=True)
     created_at = Column(TIMESTAMP)

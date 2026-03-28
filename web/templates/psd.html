@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-hero page-hero-split">
+  <div class="page-hero-copy">
+    <p class="eyebrow">PBS Document Library</p>
+    <h2>PSD &amp; DUSC Search</h2>
+    <p class="lede">
+      This page is the start of a browser-based workspace for finding, tracking, and eventually searching both PBAC Public Summary Documents and DUSC public release documents inside PBS Explorer.
+    </p>
+  </div>
+</section>
+
+<section class="psd-card psd-card-accent">
+  <h3>Current document library status</h3>
+  <div class="psd-toolbar">
+    <button class="btn btn-primary" type="button" onclick="startPSDDiscovery()">Scan PSD &amp; DUSC pages</button>
+    <button class="btn btn-secondary" type="button" onclick="downloadSampleFiles()">Download sample files</button>
+  </div>
+  <div id="psd-job-message" class="psd-job-message"></div>
+  <div id="psd-job-status" class="psd-job-status">
+    <p class="muted">Checking document job status...</p>
+  </div>
+  {% if psd_manifest.exists %}
+    <div class="psd-summary-grid">
+      <div class="stat-card">
+        <strong>{{ psd_manifest.entry_counts.PSD or 0 }}</strong>
+        <div>PSD entries</div>
+      </div>
+      <div class="stat-card">
+        <strong>{{ psd_manifest.source_counts.PSD or 0 }}</strong>
+        <div>PSD files</div>
+      </div>
+      <div class="stat-card">
+        <strong>{{ psd_manifest.entry_counts.DUSC or 0 }}</strong>
+        <div>DUSC entries</div>
+      </div>
+      <div class="stat-card">
+        <strong>{{ psd_manifest.source_counts.DUSC or 0 }}</strong>
+        <div>DUSC files</div>
+      </div>
+    </div>
+  {% else %}
+    <p class="empty-state">
+      The PSD &amp; DUSC library has not been scanned yet.
+    </p>
+  {% endif %}
+</section>
+
+<section class="psd-grid psd-grid-wide">
+  <article class="psd-card">
+    <h3>Search Sample Library</h3>
+    <form class="psd-search-form" onsubmit="runSampleSearch(); return false;">
+      <label>
+        Search PSD &amp; DUSC content
+        <input type="text" id="psd-search-query" placeholder="medicine, sponsor, indication, condition, PBAC outcome..." />
+      </label>
+      <label>
+        Sample search scope
+        <input type="text" value="Downloaded sample set only" disabled />
+      </label>
+      <button class="btn btn-primary" type="submit">Search library</button>
+    </form>
+    <p class="muted">
+      This searches only the small downloaded sample set, not the full library.
+    </p>
+    <div id="psd-search-results" class="psd-search-results"></div>
+  </article>
+</section>
+
+<script>
+let psdStatusTimer = null;
+
+function setPSDMessage(message, type = 'info') {
+  const el = document.getElementById('psd-job-message');
+  el.className = 'psd-job-message ' + type;
+  el.textContent = message;
+}
+
+function formatTime(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString();
+}
+
+function renderPSDStatus(data) {
+  const statusEl = document.getElementById('psd-job-status');
+  const manifest = data.manifest || {};
+  const modeLabel = data.mode === 'sample'
+    ? 'Download sample files'
+    : data.mode === 'download'
+      ? 'Download changed files'
+      : 'Scan PSD & DUSC pages';
+  statusEl.innerHTML = `
+    <div class="status-grid">
+      <div class="status-item"><span class="label">Job status</span><span class="value ${data.in_progress ? 'warning' : 'success'}">${data.in_progress ? 'Running' : 'Idle'}</span></div>
+      <div class="status-item"><span class="label">Current step</span><span class="value">${data.current_step || '-'}</span></div>
+      <div class="status-item"><span class="label">Last update</span><span class="value">${formatTime(data.last_success_at)}</span></div>
+    </div>
+    <div class="status-grid">
+      <div class="status-item"><span class="label">PSD entries</span><span class="value">${((manifest.entry_counts || {}).PSD || 0).toLocaleString()}</span></div>
+      <div class="status-item"><span class="label">PSD files</span><span class="value">${((manifest.source_counts || {}).PSD || 0).toLocaleString()}</span></div>
+      <div class="status-item"><span class="label">DUSC entries</span><span class="value">${((manifest.entry_counts || {}).DUSC || 0).toLocaleString()}</span></div>
+      <div class="status-item"><span class="label">DUSC files</span><span class="value">${((manifest.source_counts || {}).DUSC || 0).toLocaleString()}</span></div>
+    </div>
+    ${data.last_error ? `<div class="error-box">Last error: ${data.last_error}</div>` : ''}
+  `;
+}
+
+async function fetchPSDStatus() {
+  try {
+    const response = await fetch('/api/v1/admin/psd/status');
+    const data = await response.json();
+    renderPSDStatus(data);
+
+    if (data.in_progress && !psdStatusTimer) {
+      psdStatusTimer = window.setInterval(fetchPSDStatus, 5000);
+    } else if (!data.in_progress && psdStatusTimer) {
+      window.clearInterval(psdStatusTimer);
+      psdStatusTimer = null;
+      window.setTimeout(() => window.location.reload(), 1200);
+    }
+  } catch (error) {
+    document.getElementById('psd-job-status').innerHTML = '<div class="error-box">Could not load PSD job status.</div>';
+  }
+}
+
+async function startPSDDiscovery() {
+  setPSDMessage('Starting PSD & DUSC page scan. This updates the manifest only and does not download files.', 'info');
+  try {
+    const response = await fetch('/api/v1/admin/psd/discover', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Could not start document scan');
+    }
+    setPSDMessage(data.message, 'success');
+    fetchPSDStatus();
+  } catch (error) {
+    setPSDMessage(error.message, 'error');
+  }
+}
+
+async function downloadSampleFiles() {
+  setPSDMessage('Starting a small sample download so we can build and test search safely.', 'info');
+  try {
+    const response = await fetch('/api/v1/admin/psd/sample-download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sample_per_source: 3 }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Could not start sample download');
+    }
+    setPSDMessage(data.message + ' This prototype downloads three entries per source.', 'success');
+    fetchPSDStatus();
+  } catch (error) {
+    setPSDMessage(error.message, 'error');
+  }
+}
+
+function renderSearchResults(data) {
+  const resultsEl = document.getElementById('psd-search-results');
+  if (!data.results || data.results.length === 0) {
+    resultsEl.innerHTML = '<p class="empty-state">No results found in the downloaded sample set.</p>';
+    return;
+  }
+
+  const rows = data.results.map((result) => `
+    <tr>
+      <td>${result.source || '-'}</td>
+      <td><a href="${result.entry_url}" target="_blank" rel="noreferrer">${result.title || result.entry_url}</a></td>
+      <td>${result.snippet || '-'}</td>
+      <td>${result.local_path ? result.local_path : '-'}</td>
+      <td>${result.pdf_url ? `<a href="${result.pdf_url}" target="_blank" rel="noreferrer">PDF link</a>` : '-'}</td>
+    </tr>
+  `).join('');
+
+  resultsEl.innerHTML = `
+    <p class="muted">${data.count} result(s) found.</p>
+    <div class="results-table-wrapper">
+      <table class="results-table psd-results-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Entry</th>
+            <th>Snippet</th>
+            <th>Local file</th>
+            <th>PDF</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function runSampleSearch() {
+  const query = document.getElementById('psd-search-query').value.trim();
+  const resultsEl = document.getElementById('psd-search-results');
+  if (!query) {
+    resultsEl.innerHTML = '<p class="empty-state">Enter a search term to search the downloaded sample set.</p>';
+    return;
+  }
+  resultsEl.innerHTML = '<p class="muted">Searching sample library...</p>';
+  try {
+    const response = await fetch(`/api/v1/admin/psd/search?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || 'Search failed');
+    }
+    renderSearchResults(data);
+  } catch (error) {
+    resultsEl.innerHTML = `<div class="error-box">${error.message}</div>`;
+  }
+}
+
+fetchPSDStatus();
+</script>
+{% endblock %}

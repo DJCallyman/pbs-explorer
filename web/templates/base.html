@@ -4,20 +4,31 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PBS Explorer</title>
-    <link rel="stylesheet" href="/static/app.css" />
+    <link rel="stylesheet" href="/static/app.css?v=20260324-01" />
     <script src="/static/htmx.min.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=20260323-04"></script>
   </head>
   <body>
     <header class="site-header">
       <h1>PBS Explorer</h1>
-      <nav>
-        <a href="/">Home</a>
-        <a href="/search">Search</a>
-        <a href="/browse">Browse</a>
-        <a href="/reports">Reports</a>
-        <a href="/admin">Admin</a>
-      </nav>
+      {% if request.state.web_auth_user %}
+        <div class="site-header-actions">
+          <nav>
+            <a href="/search">Schedule &amp; Data Search</a>
+            <a href="/saved-reports">Saved Searches</a>
+            {% if request.state.enable_psd %}
+              <a href="/psd">PSD &amp; DUSC Search</a>
+            {% endif %}
+            {% if request.state.web_auth_role == "admin" %}
+              <a href="/admin">Admin</a>
+            {% endif %}
+          </nav>
+          <form method="post" action="/logout" class="logout-form">
+            <span class="site-user">{{ request.state.web_auth_user }}</span>
+            <button type="submit" class="btn btn-secondary">Logout</button>
+          </form>
+        </div>
+      {% endif %}
     </header>
     <main class="container">
       {% block content %}{% endblock %}

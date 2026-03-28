@@ -1,331 +1,137 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section>
-  <h2>Search</h2>
-  <form class="search-form" hx-get="/web/items" hx-target="#results" hx-swap="innerHTML" hx-indicator="#loading">
-    <input type="text" name="drug_name" placeholder="Drug name" />
-    <input type="text" name="brand_name" placeholder="Brand name" />
-    <input type="text" name="pbs_code" placeholder="PBS code" />
-    <select name="program_code">
-      <option value="">All Programs</option>
-      <option value="GE">General Schedule</option>
-      <option value="RP">Repatriation</option>
-    </select>
-    <select name="benefit_type_code">
-      <option value="">All Benefit Types</option>
-      <option value="U">Unrestricted</option>
-      <option value="R">Restricted</option>
-      <option value="A">Authority Required</option>
-      <option value="S">Streamlined</option>
-    </select>
-    <input type="text" name="indication" placeholder="Indication" />
-    <input type="text" name="severity" placeholder="Severity" />
-    <button type="submit">Search</button>
-    <button type="reset">Clear</button>
+<section class="search-page">
+  <div class="page-hero">
+    <div>
+      <h2 class="page-title-strong">PBS SCHEDULE &amp; SERVICES AUSTRALIA DATA SEARCH</h2>
+    </div>
+  </div>
+
+  <div class="saved-report-status-banner">
+    <div>
+      <div class="saved-report-status-eyebrow">Latest PBS Schedule Available</div>
+      <div class="saved-report-status-month" id="pbs-schedule-latest">Loading...</div>
+      <div class="saved-report-status-meta" id="pbs-schedule-meta">Checking saved status...</div>
+    </div>
+    <button type="button" class="btn btn-secondary" onclick="checkLatestPBSSchedule()">Check Latest PBS Schedule Available</button>
+  </div>
+
+  <form
+    id="item-search-form"
+    class="search-form search-form-compact"
+    hx-get="/web/items"
+    hx-target="#results"
+    hx-swap="innerHTML"
+    hx-indicator="#loading"
+  >
+    <label class="field">
+      <span>Drug</span>
+      <input type="text" name="drug_name" placeholder="Drug name" autocomplete="off" />
+    </label>
+
+    <label class="field">
+      <span>Brand</span>
+      <input type="text" name="brand_name" placeholder="Brand name" autocomplete="off" />
+    </label>
+
+    <label class="field">
+      <span>Item Code Contains</span>
+      <input type="text" name="pbs_code" placeholder="Item code" autocomplete="off" />
+    </label>
+
+    <label class="field">
+      <span>History Scope</span>
+      <select name="schedule_mode">
+        <option value="all" selected>Current + historical</option>
+        <option value="current">Current schedule only</option>
+        <option value="historical">Historical schedules only</option>
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Program</span>
+      <select name="program_code">
+        <option value="">All programs</option>
+        {% for option in program_options %}
+          <option value="{{ option.code }}">{{ option.code }} - {{ option.pbs_program }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Benefit Type</span>
+      <select name="benefit_type_code">
+        <option value="">All benefit types</option>
+        <option value="U">Unrestricted</option>
+        <option value="R">Restricted</option>
+        <option value="A">Authority Required</option>
+        <option value="S">Streamlined</option>
+      </select>
+    </label>
+
+    <label class="field field-wide">
+      <span>Indication</span>
+      <input type="text" name="indication" placeholder="e.g. melanoma, pain, heart failure" />
+    </label>
+
+    <div class="search-actions">
+      <button type="submit" class="btn btn-primary">Search</button>
+      <button type="reset" class="btn btn-secondary" data-clear-results="true">Clear</button>
+    </div>
   </form>
-  <div id="loading" class="htmx-indicator">Searching...</div>
+
+  <div class="search-status-row">
+    <div id="loading" class="htmx-indicator status-chip">Searching…</div>
+    <div class="results-hint">Grouped results can be sorted, filtered, and expanded in place.</div>
+  </div>
+
   <div id="results" class="results"></div>
-  <div id="report-section" style="display: none; margin-top: 1rem;">
-    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-      <label for="medicare-start-date" style="font-weight: 500; white-space: nowrap;">Stats start date:</label>
-      <input type="month" id="medicare-start-date" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" />
-      <label for="medicare-end-date" style="font-weight: 500; white-space: nowrap;">Stats end date:</label>
-      <input type="month" id="medicare-end-date" value="{{ medicare_end_date[:4] }}-{{ medicare_end_date[4:] }}" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;" />
+
+  <div id="report-section" class="report-card" style="display: none;">
+    <div id="report-selection-summary" class="report-selection-summary"></div>
+    <div class="report-grid">
+      <label class="field field-inline" for="medicare-start-date">
+        <span>Stats start date</span>
+        <input type="text" id="medicare-start-date" placeholder="MMM-YYYY" inputmode="text" autocomplete="off" />
+      </label>
+      <label class="field field-inline" for="medicare-end-date">
+        <span>Stats end date</span>
+        <input
+          type="text"
+          id="medicare-end-date"
+          placeholder="MMM-YYYY"
+          inputmode="text"
+          autocomplete="off"
+          data-initial-month="{{ medicare_end_date }}"
+        />
+      </label>
+      <label class="field field-inline" for="report-var">
+        <span>Report on</span>
+        <select id="report-var">
+          <option value="SERVICES" selected>Services</option>
+          <option value="BENEFIT">Benefit</option>
+        </select>
+      </label>
+      <label class="field field-inline" for="report-format">
+        <span>Report format</span>
+        <select id="report-format">
+          <option value="1">1 - Scheme by state</option>
+          <option value="2" selected>2 - Scheme + month by state</option>
+          <option value="3">3 - Scheme + financial year by state</option>
+          <option value="4">4 - Scheme + calendar year by state</option>
+          <option value="5">5 - Patient category</option>
+          <option value="6">6 - Month by patient category</option>
+          <option value="7">7 - Financial year by patient category</option>
+          <option value="8">8 - Calendar year by patient category</option>
+        </select>
+      </label>
     </div>
-    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-      <label for="report-var" style="font-weight: 500; white-space: nowrap;">Report On:</label>
-      <select id="report-var" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-        <option value="SERVICES" selected>Services</option>
-        <option value="BENEFIT">Benefit</option>
-      </select>
-      <label for="report-format" style="font-weight: 500; white-space: nowrap;">Report Format:</label>
-      <select id="report-format" style="padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
-        <option value="1">1 – by scheme (rows) by state (cols)</option>
-        <option value="2" selected>2 – by scheme and month (rows) by state (cols)</option>
-        <option value="3">3 – by scheme and fin. year (rows) by state (cols)</option>
-        <option value="4">4 – by scheme and cal. year (rows) by state (cols)</option>
-        <option value="5">5 – by patient category (cols)</option>
-        <option value="6">6 – by month (rows) by patient category (cols)</option>
-        <option value="7">7 – by fin. year (rows) by patient category (cols)</option>
-        <option value="8">8 – by cal. year (rows) by patient category (cols)</option>
-      </select>
+    <div class="report-actions">
+      <button type="button" class="btn btn-primary" onclick="viewPBSReport()">View Medicare Statistics Report</button>
+      <button type="button" class="btn btn-secondary" onclick="copyReportURL()">Copy Report URL</button>
+      <button type="button" class="btn btn-primary" onclick="downloadExcel()">Download Excel</button>
     </div>
-    <button type="button" class="btn btn-primary" onclick="viewPBSReport()">
-      View Medicare Statistics Report
-    </button>
-    <button type="button" class="btn btn-secondary" onclick="copyReportURL()" style="margin-left: 0.5rem;">
-      Copy Report URL
-    </button>
-    <button type="button" class="btn btn-primary" onclick="downloadExcel()" style="margin-left: 0.5rem;">
-      Download Excel
-    </button>
   </div>
 </section>
-
-<script>
-// Set max to current month so future months can't be selected
-(function() {
-  const now = new Date();
-  const max = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  document.getElementById('medicare-end-date').setAttribute('max', max);
-})();
-
-function getMedicareEndDate() {
-  const picker = document.getElementById('medicare-end-date');
-  if (picker && picker.value) {
-    return picker.value.replace('-', '');
-  }
-  return '{{ medicare_end_date }}';
-}
-
-function getMedicareStartDate() {
-  const picker = document.getElementById('medicare-start-date');
-  if (picker && picker.value) {
-    return picker.value.replace('-', '');
-  }
-  // Fallback: compute from results (earliest listing date)
-  let earliest = null;
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const listedText = row.querySelectorAll('td')[3]?.textContent.trim();
-    if (listedText) {
-      const d = new Date(listedText);
-      if (!isNaN(d) && (!earliest || d < earliest)) earliest = d;
-    }
-  });
-  if (earliest) {
-    return earliest.getFullYear() + String(earliest.getMonth() + 1).padStart(2, '0');
-  }
-  return '202501';
-}
-
-function getReportVar() {
-  const sel = document.getElementById('report-var');
-  return sel ? sel.value : 'SERVICES';
-}
-
-function getReportFormat() {
-  const sel = document.getElementById('report-format');
-  return sel ? sel.value : '2';
-}
-
-function getPBSReportURL() {
-  const pbsCodes = [];
-  
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const cells = row.querySelectorAll('td');
-    if (cells.length >= 4) {
-      const pbsCode = cells[2].textContent.trim();
-      if (pbsCode) {
-        pbsCodes.push(pbsCode);
-      }
-    }
-  });
-  
-  if (pbsCodes.length === 0) {
-    alert('No results to generate report for');
-    return null;
-  }
-
-  const uniqueCodes = [...new Set(pbsCodes)];
-  const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
-  const params = new URLSearchParams({
-    pbs_codes: itemlst,
-    start_date: getMedicareStartDate(),
-    end_date: getMedicareEndDate(),
-    var: getReportVar(),
-    rpt_fmt: getReportFormat()
-  });
-  
-  return '/web/pbs-report?' + params.toString();
-}
-
-function getDirectReportURL() {
-  const pbsCodes = [];
-  
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const cells = row.querySelectorAll('td');
-    if (cells.length >= 4) {
-      const pbsCode = cells[2].textContent.trim();
-      if (pbsCode) {
-        pbsCodes.push(pbsCode);
-      }
-    }
-  });
-  
-  if (pbsCodes.length === 0) {
-    return null;
-  }
-
-  const uniqueCodes = [...new Set(pbsCodes)];
-  
-  const baseURL = 'https://medicarestatistics.humanservices.gov.au/SASStoredProcess/guest';
-  const program = 'SBIP://METASERVER/Shared Data/sasdata/prod/VEA0032/SAS.StoredProcess/statistics/pbs_item_standard_report';
-  
-  const itemlst = uniqueCodes.map(c => "'" + c.padStart(6, '0') + "'").join(",");
-  const listParam = uniqueCodes.join(',');
-  const encodedProgram = encodeURIComponent(program);
-  const encodedItemlst = encodeURIComponent(itemlst);
-  
-  return baseURL + '?_PROGRAM=' + encodedProgram + '&itemlst=' + encodedItemlst + '&ITEMCNT=' + uniqueCodes.length + '&LIST=' + encodeURIComponent(listParam) + '&VAR=' + getReportVar() + '&RPT_FMT=' + getReportFormat() + '&start_dt=' + getMedicareStartDate() + '&end_dt=' + getMedicareEndDate();
-}
-
-function viewPBSReport() {
-  const url = getDirectReportURL();
-  if (!url) {
-    alert('No results to generate report for');
-    return;
-  }
-  // Open via a temporary <a rel="noreferrer"> to strip the Referer header.
-  // The SAS server blocks requests with a Referer (CSRF protection),
-  // so this makes it behave like pasting the URL into a new tab.
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noreferrer noopener';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-
-function copyReportURL() {
-  const url = getDirectReportURL();
-  if (!url) {
-    alert('No results to generate report for');
-    return;
-  }
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(() => {
-        alert('URL copied! Paste it directly into a new browser tab.');
-      }).catch(() => {
-        prompt('Copy this URL:', url);
-      });
-    } else {
-      prompt('Copy this URL:', url);
-    }
-  } catch (err) {
-    prompt('Copy this URL:', url);
-  }
-}
-
-function downloadExcel() {
-  const pbsCodes = [];
-  document.querySelectorAll('#results tbody tr').forEach(row => {
-    const cells = row.querySelectorAll('td');
-    if (cells.length >= 4) {
-      const pbsCode = cells[2].textContent.trim();
-      if (pbsCode) pbsCodes.push(pbsCode);
-    }
-  });
-  if (pbsCodes.length === 0) {
-    alert('No results to generate report for');
-    return;
-  }
-  const uniqueCodes = [...new Set(pbsCodes)];
-  const itemlst = "''" + ",'" + uniqueCodes.join("','") + "',''";
-  const params = new URLSearchParams({
-    pbs_codes: itemlst,
-    start_date: getMedicareStartDate(),
-    end_date: getMedicareEndDate(),
-    var: getReportVar(),
-    rpt_fmt: getReportFormat()
-  });
-  // Show a loading indicator on the button
-  const btn = document.querySelector('[onclick="downloadExcel()"]');
-  const origText = btn.textContent;
-  btn.textContent = 'Downloading…';
-  btn.disabled = true;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90 * 1000);
-
-  fetch('/web/pbs-report-excel?' + params.toString(), { signal: controller.signal })
-    .then(resp => {
-      if (!resp.ok) return resp.json().then(e => { throw new Error(e.detail || 'Download failed'); });
-      const cd = resp.headers.get('content-disposition') || '';
-      const match = cd.match(/filename="?([^";\s]+)"?/);
-      const filename = match ? match[1] : 'pbs_report.xls';
-      return resp.blob().then(blob => ({ blob, filename }));
-    })
-    .then(({ blob, filename }) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    })
-    .catch(err => {
-      if (err.name === 'AbortError') {
-        alert('Download timed out. Please try again — it should be faster the second time.');
-      } else {
-        alert('Download failed: ' + err.message);
-      }
-    })
-    .finally(() => {
-      clearTimeout(timeoutId);
-      btn.textContent = origText;
-      btn.disabled = false;
-    });
-}
-
-document.body.addEventListener('htmx:afterSwap', function(e) {
-  if (e.detail.target.id === 'results') {
-    const reportSection = document.getElementById('report-section');
-    const hasResults = document.querySelectorAll('#results tbody tr').length > 0;
-    reportSection.style.display = hasResults ? 'block' : 'none';
-
-    // Set the start-date picker to earliest listing date and constrain both pickers
-    if (hasResults) {
-      let earliestDate = null;
-      document.querySelectorAll('#results tbody tr').forEach(row => {
-        const listedText = row.querySelectorAll('td')[3]?.textContent.trim();
-        if (listedText) {
-          const d = new Date(listedText);
-          if (!isNaN(d) && (!earliestDate || d < earliestDate)) earliestDate = d;
-        }
-      });
-      if (earliestDate) {
-        const minVal = earliestDate.getFullYear() + '-' + String(earliestDate.getMonth() + 1).padStart(2, '0');
-        const startPicker = document.getElementById('medicare-start-date');
-        const endPicker = document.getElementById('medicare-end-date');
-        // Default start date = earliest listing date; min = earliest listing date
-        startPicker.value = minVal;
-        startPicker.setAttribute('min', minVal);
-        startPicker.setAttribute('max', endPicker.value);
-        // End-date min = earliest listing date
-        endPicker.setAttribute('min', minVal);
-      }
-    }
-
-    // Fire-and-forget warmup: hit SAS server now so the report is
-    // cached by the time the user clicks "Download Excel".
-    if (hasResults) {
-      const pbsCodes = [];
-      document.querySelectorAll('#results tbody tr').forEach(row => {
-        const cells = row.querySelectorAll('td');
-        if (cells.length >= 4) {
-          const code = cells[2].textContent.trim();
-          if (code) pbsCodes.push(code);
-        }
-      });
-      if (pbsCodes.length) {
-        const uniqueCodes = [...new Set(pbsCodes)];
-        const itemlst = "''" + ",'"+ uniqueCodes.join("','") +"',''";
-        const params = new URLSearchParams({
-          pbs_codes: itemlst,
-          start_date: getMedicareStartDate(),
-          end_date: getMedicareEndDate(),
-          var: getReportVar(),
-          rpt_fmt: getReportFormat()
-        });
-        fetch('/web/pbs-report-warmup?' + params.toString(), { method: 'POST' }).catch(() => {});
-      }
-    }
-  }
-});
-</script>
 {% endblock %}

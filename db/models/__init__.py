@@ -34,8 +34,12 @@ from db.models.standard_formula_preparation import StandardFormulaPreparation
 from db.models.summary_of_change import SummaryOfChange
 from db.models.item_pricing_event import ItemPricingEvent
 from db.models.amt_item import AMTItem
+from db.models.medicine_status_entry import MedicineStatusEntry
 from db.models.sync_state import SyncState
 from db.models.app_setting import AppSetting
+from db.models.web_user import WebUser
+from db.models.web_session import WebSession
+from db.models.saved_report import SavedReport
 
 __all__ = [
     "Schedule",
@@ -72,6 +76,10 @@ __all__ = [
     "SummaryOfChange",
     "ItemPricingEvent",
     "AMTItem",
+    "MedicineStatusEntry",
     "SyncState",
     "AppSetting",
+    "WebUser",
+    "WebSession",
+    "SavedReport",
 ]

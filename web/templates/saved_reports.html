@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="search-page">
+  <div class="page-hero">
+    <div>
+      <h2 class="page-title-strong">SAVED SERVICES AUSTRALIA DATA SEARCHES</h2>
+    </div>
+  </div>
+
+  {% if message %}
+    <div class="saved-report-flash saved-report-flash-success">{{ message }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="saved-report-flash saved-report-flash-error">{{ error }}</div>
+  {% endif %}
+
+  <div class="saved-report-status-banner">
+    <div>
+      <div class="saved-report-status-eyebrow">Latest Medicare Data Available</div>
+      <div class="saved-report-status-month">{{ medicare_status.end_date_label }}</div>
+      <div class="saved-report-status-meta">
+        {% if medicare_status.last_checked_at %}
+          Last checked {{ medicare_status.last_checked_at }}
+        {% else %}
+          Not checked yet
+        {% endif %}
+      </div>
+    </div>
+    <form action="/web/saved-reports/check-latest" method="post" class="saved-report-inline-form">
+      <button type="submit" class="btn btn-secondary">Check Latest Medicare Data Available</button>
+    </form>
+  </div>
+
+  <div class="report-card">
+    <div class="saved-report-form-header">
+      <h3>{{ form_heading }}</h3>
+      {% if edit_mode %}
+        <a class="btn btn-secondary" href="/saved-reports">Cancel Edit</a>
+      {% endif %}
+    </div>
+    <form id="saved-report-form" class="search-form search-form-compact" action="{{ form_action }}" method="post">
+      <label class="field">
+        <span>Name</span>
+        <input type="text" name="name" placeholder="e.g. Cemiplimab NSCLC State 12M" value="{{ form_initial.name }}" required />
+      </label>
+
+      <label class="field field-wide">
+        <span>Description</span>
+        <input type="text" name="description" placeholder="Optional note for what this tracker is for" value="{{ form_initial.description }}" />
+      </label>
+
+      <label class="field">
+        <span>Source type</span>
+        <select name="source_type" id="saved-report-source-type">
+          <option value="search_based" {% if form_initial.source_type == "search_based" %}selected{% endif %}>Search based</option>
+          <option value="fixed_codes" {% if form_initial.source_type == "fixed_codes" %}selected{% endif %}>Fixed Item Codes</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Metric</span>
+        <select name="var">
+          <option value="SERVICES" {% if form_initial.var == "SERVICES" %}selected{% endif %}>Services</option>
+          <option value="BENEFIT" {% if form_initial.var == "BENEFIT" %}selected{% endif %}>Benefit</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Report format</span>
+        <select name="rpt_fmt">
+          <option value="2" {% if form_initial.rpt_fmt == "2" %}selected{% endif %}>Month by state</option>
+          <option value="6" {% if form_initial.rpt_fmt == "6" %}selected{% endif %}>Month by patient category</option>
+          <option value="3" {% if form_initial.rpt_fmt == "3" %}selected{% endif %}>Financial year by state</option>
+          <option value="4" {% if form_initial.rpt_fmt == "4" %}selected{% endif %}>Calendar year by state</option>
+          <option value="7" {% if form_initial.rpt_fmt == "7" %}selected{% endif %}>Financial year by patient category</option>
+          <option value="8" {% if form_initial.rpt_fmt == "8" %}selected{% endif %}>Calendar year by patient category</option>
+          <option value="1" {% if form_initial.rpt_fmt == "1" %}selected{% endif %}>Scheme by state</option>
+          <option value="5" {% if form_initial.rpt_fmt == "5" %}selected{% endif %}>Patient category</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Window</span>
+        <select name="window_type" id="saved-report-window-type">
+          <option value="since_first_listing" {% if form_initial.window_type == "since_first_listing" %}selected{% endif %}>From First PBS listing</option>
+          <option value="rolling_months" {% if form_initial.window_type == "rolling_months" %}selected{% endif %}>By time period</option>
+          <option value="explicit" {% if form_initial.window_type == "explicit" %}selected{% endif %}>By Date Range</option>
+        </select>
+      </label>
+
+      <label class="field" data-window-field="rolling_months">
+        <span>Window months</span>
+        <input type="number" name="window_months" min="1" value="{{ form_initial.window_months }}" />
+      </label>
+
+      <label class="field" data-window-field="explicit">
+        <span>Window start</span>
+        <input type="month" name="window_start_date" value="{{ form_initial.window_start_date }}" />
+      </label>
+
+      <label class="field" data-window-field="explicit">
+        <span>Window end</span>
+        <input type="month" name="window_end_date" value="{{ form_initial.window_end_date }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>Drug</span>
+        <input type="text" name="drug_name" placeholder="Required unless Brand is filled" value="{{ form_initial.drug_name }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>Brand</span>
+        <input type="text" name="brand_name" placeholder="Required unless Drug is filled" value="{{ form_initial.brand_name }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>Item Code Contains</span>
+        <input type="text" name="pbs_code" value="{{ form_initial.pbs_code }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>Program code</span>
+        <input type="text" name="program_code" placeholder="Optional" value="{{ form_initial.program_code }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>Benefit type</span>
+        <select name="benefit_type_code">
+          <option value="" {% if not form_initial.benefit_type_code %}selected{% endif %}>Any</option>
+          <option value="U" {% if form_initial.benefit_type_code == "U" %}selected{% endif %}>Unrestricted</option>
+          <option value="R" {% if form_initial.benefit_type_code == "R" %}selected{% endif %}>Restricted</option>
+          <option value="A" {% if form_initial.benefit_type_code == "A" %}selected{% endif %}>Authority Required</option>
+          <option value="S" {% if form_initial.benefit_type_code == "S" %}selected{% endif %}>Streamlined</option>
+        </select>
+      </label>
+
+      <label class="field field-wide" data-source-field="search_based">
+        <span>Indication</span>
+        <input type="text" name="indication" placeholder="e.g. NSCLC" value="{{ form_initial.indication }}" />
+      </label>
+
+      <label class="field" data-source-field="search_based">
+        <span>History scope</span>
+        <select name="schedule_mode">
+          <option value="all" {% if form_initial.schedule_mode == "all" %}selected{% endif %}>Current + historical</option>
+          <option value="current" {% if form_initial.schedule_mode == "current" %}selected{% endif %}>Current only</option>
+          <option value="historical" {% if form_initial.schedule_mode == "historical" %}selected{% endif %}>Historical only</option>
+        </select>
+      </label>
+
+      <label class="field field-wide" data-source-field="fixed_codes">
+        <span>Fixed Item Codes</span>
+        <textarea name="fixed_codes" rows="3" placeholder="Only used when source type is Fixed Item Codes. Enter comma-separated item codes.">{{ form_initial.fixed_codes }}</textarea>
+      </label>
+
+      <div class="search-actions">
+        <button type="submit" class="btn btn-primary">{{ form_submit_label }}</button>
+      </div>
+    </form>
+  </div>
+
+  {% if reports %}
+    <div class="saved-report-list">
+      {% for report in reports %}
+        <article class="saved-report-card">
+          <div class="saved-report-card-header">
+            <div>
+              <h3>{{ report.name }}</h3>
+              {% if report.description %}
+                <p class="saved-report-slug">{{ report.description }}</p>
+              {% endif %}
+            </div>
+            <div class="saved-report-status saved-report-status-{{ report.status_level }}">
+              {{ report.status_text }}
+            </div>
+          </div>
+
+          <div class="saved-report-meta">
+            <div><strong>Owner</strong> {{ report.owner or "Legacy shared" }}</div>
+            <div><strong>Shared with</strong> {{ report.shared_with|join(", ") if report.shared_with else "Not shared" }}</div>
+            <div><strong>Metric</strong> {{ report.metric }}</div>
+            <div><strong>Format</strong> {{ report.report_format_label }}</div>
+            <div><strong>Window</strong> {{ report.window_label }}</div>
+          </div>
+
+          {% if report.validated_at %}
+            <div class="saved-report-search-summary">
+              <strong>Last validated</strong> {{ report.validated_at }}
+            </div>
+          {% endif %}
+
+          {% if report.search_summary %}
+            <div class="saved-report-search-summary">
+              <strong>Search</strong> {{ report.search_summary }}
+            </div>
+          {% endif %}
+
+          {% if report.cached_summaries %}
+            <div class="saved-report-code-preview">
+              <strong>Included codes</strong>
+              <table class="saved-report-code-table">
+                <thead>
+                  <tr>
+                    <th>PBS code</th>
+                    <th>Drug</th>
+                    <th>Brand</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for code in report.cached_summaries %}
+                    <tr>
+                      <td>{{ code.pbs_code }}</td>
+                      <td>{{ code.drug_name or "—" }}</td>
+                      <td>{{ code.brand_name or "—" }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+
+          {% if report.warning %}
+            <div class="saved-report-warning">{{ report.warning }}</div>
+          {% endif %}
+
+          <div class="report-actions">
+            {% if report.can_manage %}
+              <a class="btn btn-secondary" href="{{ report.edit_url }}">Edit</a>
+            {% endif %}
+            <form action="{{ report.validate_url }}" method="post" class="saved-report-inline-form">
+              <button type="submit" class="btn btn-secondary">Validate</button>
+            </form>
+            <a class="btn btn-primary" href="{{ report.absolute_csv_url }}">Download Chart CSV</a>
+            {% if report.can_manage %}
+              <form action="{{ report.delete_url }}" method="post" class="saved-report-inline-form" onsubmit="return window.confirm('Delete saved report {{ report.name|e }}?');">
+                <button type="submit" class="btn btn-danger">Delete</button>
+              </form>
+            {% endif %}
+          </div>
+
+          {% if report.can_manage %}
+            <div class="saved-report-url-block">
+              <div class="saved-report-url-header">
+                <strong>Share with users</strong>
+              </div>
+              {% if share_user_options %}
+                <details class="saved-report-share-panel">
+                  <summary>
+                    <span>Manage Sharing</span>
+                    <span class="saved-report-share-summary">
+                      {% if report.shared_with %}
+                        Shared with {{ report.shared_with|join(", ") }}
+                      {% else %}
+                        Private to owner
+                      {% endif %}
+                    </span>
+                  </summary>
+                  <form action="{{ report.share_url }}" method="post" class="saved-report-share-form">
+                    <div class="saved-report-share-options">
+                      {% for username in share_user_options %}
+                        <label class="saved-report-share-option">
+                          <input type="checkbox" name="shared_with" value="{{ username }}" {% if username in report.shared_with %}checked{% endif %} />
+                          <span>{{ username }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+                    <div class="saved-report-share-help">
+                      Tick the users who should see this report, then click <strong>Save Sharing</strong>.
+                      To make it private again, click <strong>Remove All Sharing</strong>.
+                    </div>
+                    <div class="search-actions">
+                      <button type="submit" class="btn btn-secondary">Save Sharing</button>
+                    </div>
+                  </form>
+                  <form action="{{ report.share_url }}" method="post" class="saved-report-inline-form saved-report-share-clear-form" onsubmit="return window.confirm('Remove sharing for {{ report.name|e }} and keep it private to the owner?');">
+                    <button type="submit" class="btn btn-secondary">Remove All Sharing</button>
+                  </form>
+                </details>
+              {% else %}
+                <div class="saved-report-share-help">No other users are available to share this report with yet.</div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="saved-report-url-block">
+            <div class="saved-report-url-header">
+              <strong>Power Query URL</strong>
+              <div class="saved-report-url-actions">
+                <button type="button" class="btn btn-secondary" data-copy-text="{{ report.absolute_csv_url }}">Copy hyperlink</button>
+                {% if report.can_manage %}
+                  <form action="{{ report.rotate_token_url }}" method="post" class="saved-report-inline-form" onsubmit="return window.confirm('Rotate the Power Query URL for {{ report.name|e }}? Existing Excel links will stop working until updated.');">
+                    <button type="submit" class="btn btn-secondary">Rotate URL</button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+            <code>{{ report.absolute_csv_url }}</code>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="report-card">
+      <h3>No saved reports yet</h3>
+      <p>
+        Use the form above to create your first saved report.
+      </p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

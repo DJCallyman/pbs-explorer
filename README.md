@@ -32,6 +32,20 @@ export PBS_EXPLORER_DB_PATH=./pbs_data.db
 export PBS_EXPLORER_LOG_LEVEL=INFO
 ```
 
+For a stable local or Mac mini deployment, create a `.env` file first:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and set:
+
+```bash
+PBS_EXPLORER_PBS_SUBSCRIPTION_KEY=your_real_subscription_key
+```
+
+The server startup script now refuses to start if this key is missing or still set to the placeholder value.
+
 ## Bootstrap Database
 
 ```bash
@@ -41,13 +55,58 @@ python -m tasks.bootstrap_db
 ## Run API Server
 
 ```bash
-uvicorn main:app --reload
+./scripts/run_server.sh
+```
+
+To stop it cleanly:
+
+```bash
+./scripts/stop_server.sh
 ```
 
 ## Run Sync Task
 
 ```bash
 python -m tasks.sync
+```
+
+## Run Incremental Sync
+
+```bash
+python -m tasks.sync_incremental
+```
+
+## Mac Mini + Tailscale Deployment
+
+For a simple private deployment on an always-on Mac Mini, see:
+
+- `docs/MAC_MINI_TAILSCALE_SETUP.md`
+- `docs/SECURE_DEPLOYMENT.md`
+- `docs/CLOUDFLARE_MAC_MINI_SETUP.md`
+- `docs/CLOUDFLARE_DASHBOARD_CHECKLIST.md`
+
+This is the recommended path if you want secure browser access from work without exposing the app publicly.
+
+## Security Defaults
+
+- The app now binds to `127.0.0.1` by default.
+- FastAPI docs are disabled by default.
+- If you run on a non-local host, `./scripts/run_server.sh` requires `PBS_EXPLORER_WEB_USERNAME` and `PBS_EXPLORER_WEB_PASSWORD`.
+- Trusted hosts can be set with `PBS_EXPLORER_SERVER_TRUSTED_HOSTS`.
+
+## Build A Deployment Bundle
+
+Create a Mac-mini-ready archive:
+
+```bash
+chmod +x scripts/build_deploy_bundle.sh
+./scripts/build_deploy_bundle.sh
+```
+
+Or build code only:
+
+```bash
+./scripts/build_deploy_bundle.sh --without-db
 ```
 
 ## Docker Deployment

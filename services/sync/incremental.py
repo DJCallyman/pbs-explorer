@@ -28,6 +28,10 @@ class IncrementalSync:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.client = PBSAPIClient()
+        self._schedule_effective_date_cache: dict[str, str | None] = {}
+
+    async def aclose(self) -> None:
+        await self.client.aclose()
 
     async def get_changes(
         self,
@@ -58,6 +62,8 @@ class IncrementalSync:
 
     async def _get_schedule_effective_date(self, schedule_code: str) -> Optional[str]:
         """Get the effective date for a schedule code from the API."""
+        if schedule_code in self._schedule_effective_date_cache:
+            return self._schedule_effective_date_cache[schedule_code]
         response = await self.client.get(
             "/schedules",
             params={
@@ -68,7 +74,10 @@ class IncrementalSync:
         )
         rows, _ = parse_json(response.text)
         if rows:
-            return rows[0].get("effective_date")
+            effective_date = rows[0].get("effective_date")
+            self._schedule_effective_date_cache[schedule_code] = effective_date
+            return effective_date
+        self._schedule_effective_date_cache[schedule_code] = None
         return None
 
     async def apply_change(
